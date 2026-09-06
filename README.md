@@ -52,17 +52,12 @@ exam-prep-agent/
 ├── embeddings/      # ChromaDB storage logic
 ├── agents/          # Ingestor, Pattern, Quiz Master agents
 ├── db/              # SQLite performance tracking (later)
+├── sample_data/     # contains all the pdfs/pptx/videos and past question papers.
+   ├── lecture_videos/
+   └──past_qps/
 ├── test_setup.py    # Day 1 environment checkpoint
 ├── requirements.txt
 └── .env.example
 ```
 
-## Roadmap
 
-- [x] Day 1 — Environment setup
-- [ ] Day 2 — PDF + PPTX ingestion
-- [ ] Day 3 — Past QPs + lecture video ingestion
-- [ ] Day 4 — Pattern Agent (topic frequency analysis)
-- [ ] Day 5 — Quiz Master Agent
-- [ ] Day 6 — CrewAI orchestration
-- [ ] Day 7 — Dual-mode LLM wrapper + deploy to Hugging Face Spaces
