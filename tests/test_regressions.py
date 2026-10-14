@@ -11,10 +11,13 @@ from ingestion.pipeline import ingest_file
 
 
 class RegressionTests(unittest.TestCase):
+    @patch("ingestion.pipeline.source_fingerprint", return_value=None)
+    @patch("ingestion.pipeline.register_source")
+    @patch("ingestion.pipeline.delete_source_vectors")
     @patch("ingestion.pipeline.replace_pages")
     @patch("ingestion.pipeline.store_chunks", return_value=1)
     @patch("ingestion.pipeline.load_document", return_value=[(1, "Normalization reduces redundancy.")])
-    def test_pdf_is_accepted_as_lecture_note(self, load, store, save):
+    def test_pdf_is_accepted_as_lecture_note(self, load, store, save, delete, register, fingerprint):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "Module-1.pdf"
             path.write_bytes(b"placeholder")
