@@ -54,3 +54,5 @@ The demo uses a small CPU sentence-transformer embedding model and Groq for gene
 - `app.py`: Streamlit interface
 
 The `test_day2.py` through `test_day5.py` scripts are optional subject-aware checkpoints.
+
+Local study files belong in the ignored sample_data/ folder, with lecture_videos/ and past_qps/ subfolders as needed.
