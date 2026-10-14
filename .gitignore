@@ -23,6 +23,7 @@ frontend/.env.local
 *.sqlite3-wal
 *.sqlite3-shm
 db/performance-audit.json
+db/model_cache/
 *.tsbuildinfo
 playwright-report/
 test-results/

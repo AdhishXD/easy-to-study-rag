@@ -147,15 +147,18 @@ function App() {
     const list = await api<Subject[]>('/subjects')
     setSubjects(list)
     if (!name) return
-    const [library, insights, results] = await Promise.all([
+    const [library, insights, results, savedQuiz] = await Promise.all([
       api<Material[]>(`/library?${query({ subject: name })}`),
       api<Analysis | null>(`/analysis?${query({ subject: name })}`),
       api<Progress[]>(`/progress?${query({ subject: name })}`),
+      api<Quiz | null>(`/quizzes/latest?${query({ subject: name })}`),
     ])
     if (selection.current !== name) return
     setMaterials(library)
     setAnalysis(insights)
     setProgress(results)
+    setQuiz(savedQuiz)
+    setQuizSubject(name)
   }, [])
 
   useEffect(() => {
@@ -630,8 +633,7 @@ function App() {
                         className="button primary"
                         disabled={
                           running.some((j) => j.kind === 'analysis') ||
-                          !materials.some((m) => m.source_type !== 'past_qp') ||
-                          !paperYears.length
+                          !materials.some((m) => m.source_type !== 'past_qp')
                         }
                         onClick={() => void enqueue('/analysis', { subject })}
                       >
@@ -645,8 +647,8 @@ function App() {
                         </span>
                       ) : (
                         <span className="panel-footnote">
-                          Needs teaching material and at least one dated past
-                          paper
+                          Add teaching material to begin. Past papers unlock
+                          exam patterns.
                         </span>
                       )}
                     </section>
@@ -758,11 +760,11 @@ function App() {
                 />
               ) : view === 'practice' ? (
                 <Practice
+                  key={`${subject}:${quizSubject === subject ? quiz?.quiz_id || 'new' : 'new'}`}
                   analysis={analysis}
                   quiz={quizSubject === subject ? quiz : null}
                   busy={running.some((j) => j.kind === 'quiz')}
                   generate={(name, kind, count) => {
-                    setQuiz(null)
                     void enqueue('/quizzes', {
                       subject,
                       topic: name,

@@ -15,7 +15,7 @@ from backend.main import app
 from ingestion import source_store
 from agents.analysis import analyze_subject, save_analysis, _extract_paper_questions, _find_repeats
 from agents.llm import chat
-from backend.practice import save_quiz, answer_question, progress
+from backend.practice import save_quiz, answer_question, progress, latest_quiz
 
 
 class IsolatedTests(unittest.TestCase):
@@ -29,6 +29,7 @@ class IsolatedTests(unittest.TestCase):
         self.stack.enter_context(patch("ingestion.source_store.DB_PATH", self.root / "pages.sqlite3"))
         self.stack.enter_context(patch("agents.analysis.DB_PATH", self.root / "pages.sqlite3"))
         self.stack.enter_context(patch("backend.main.DEMO", False))
+        self.stack.enter_context(patch("embeddings.embed_store.EMBED_PROVIDER", "ollama"))
 
     def tearDown(self):
         self.stack.close()
@@ -83,6 +84,65 @@ class IsolatedTests(unittest.TestCase):
                 store_chunks([{"id": "one", "text": "first", "metadata": {}},
                               {"id": "two", "text": "second", "metadata": {}}])
             collection.return_value.upsert.assert_not_called()
+
+    def test_cpu_embeddings_do_not_require_ollama(self):
+        from embeddings.embed_store import embed_many
+        with patch("embeddings.embed_store.EMBED_PROVIDER", "fastembed"), \
+             patch("embeddings.embed_store.cpu_model") as model, patch("ollama.Client") as ollama:
+            from unittest.mock import Mock
+            vector = Mock()
+            vector.tolist.return_value = [0.1, 0.2, 0.3]
+            model.return_value.embed.return_value = [vector]
+            self.assertEqual(embed_many(["CPU embedding"]), [[0.1, 0.2, 0.3]])
+            self.assertEqual(embed_many(["CPU embedding"]), [[0.1, 0.2, 0.3]])
+            model.return_value.embed.assert_called_once()
+            ollama.assert_not_called()
+
+    def test_notes_only_subject_can_analyze_and_generate_practice(self):
+        source_store.replace_pages("DBMS", "lecture_note", "notes.txt", [(1, "Normalization reduces redundancy")])
+        topic = {"name": "Normalization", "summary": "Normalization reduces redundancy", "sources": [{"filename": "notes.txt", "page": 1}]}
+        with patch("agents.analysis._extract_teaching_topics", return_value=[topic]):
+            analysis = analyze_subject("DBMS")
+        self.assertEqual(analysis["topics"][0]["num_years"], 0)
+        self.assertEqual(analysis["questions"], [])
+        question = {"question": "What is reduced?", "options": ["Redundancy", "Security", "Accuracy", "Integrity"],
+                    "correct_answer": "Redundancy", "explanation": "Normalization reduces redundancy", "sources": ["notes.txt"], "question_type": "mcq"}
+        with patch("backend.main.generate_questions_for_topic", return_value=[question]), TestClient(app) as client:
+            response = client.post("/api/quizzes", json={"subject": "DBMS", "topic": "Normalization", "count": 1})
+            self.assertEqual(response.status_code, 202)
+            for _ in range(100):
+                job = client.get(f"/api/jobs/{response.json()['id']}").json()
+                if job["status"] not in {"queued", "running"}: break
+                time.sleep(.01)
+            self.assertEqual(job["status"], "completed")
+            self.assertEqual(client.get("/api/quizzes/latest", params={"subject": "DBMS"}).json()["quiz_id"], job["result"]["quiz_id"])
+
+    def test_resume_practice_preserves_first_answer_and_subject(self):
+        question = {"question": "Q?", "options": ["A", "B", "C", "D"], "correct_answer": "B",
+                    "explanation": "B is correct", "sources": ["notes.txt"], "question_type": "mcq"}
+        quiz = save_quiz("DBMS", "Normalization", [question])
+        save_quiz("Electrical", "Circuits", [question])
+        answer_question(quiz["quiz_id"], 0, "A")
+        retry = answer_question(quiz["quiz_id"], 0, "B")
+        self.assertFalse(retry["correct"])
+        self.assertEqual(retry["selected_answer"], "A")
+        restored = latest_quiz("DBMS")
+        self.assertEqual(restored["quiz_id"], quiz["quiz_id"])
+        self.assertEqual(restored["attempts"], [{"question_index": 0, "correct": False, "answer": "A"}])
+        self.assertIsNone(latest_quiz("No course"))
+
+    def test_saved_pages_rebuild_new_index_once(self):
+        from ingestion.pipeline import ensure_subject_index
+        source_store.replace_pages("DBMS", "lecture_note", "notes.txt", [(1, "Normalization reduces redundancy")])
+        with patch("ingestion.pipeline.get_collection") as collection, \
+             patch("ingestion.pipeline.store_chunks") as store, patch("ingestion.pipeline.delete_source_vectors"):
+            collection.return_value.get.return_value = {"ids": ["one"]}
+            ensure_subject_index("DBMS")
+            ensure_subject_index("DBMS")
+            store.assert_called_once()
+            source_store.replace_pages("DBMS", "lecture_note", "notes.txt", [(1, "Normalization reduces update anomalies")])
+            ensure_subject_index("DBMS")
+            self.assertEqual(store.call_count, 2)
 
     def test_filename_year_takes_priority_over_fallback(self):
         from ingestion.pipeline import ingest_file

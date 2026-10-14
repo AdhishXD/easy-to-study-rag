@@ -286,15 +286,13 @@ def analyze_subject(subject: str, *, force: bool = False) -> dict:
         return existing
     if not teaching:
         raise ValueError("Upload lecture notes, a textbook, or a lecture recording for this subject first")
-    if not papers:
-        raise ValueError("Upload at least one dated past paper for this subject first")
     topics = _extract_teaching_topics(teaching)
     report("Combining related syllabus concepts", 0.36)
     topics = _merge_topics(topics)
     if not topics:
         raise ValueError("No grounded topics could be extracted; inspect the source text/OCR")
     questions = _extract_paper_questions(papers)
-    if not questions:
+    if papers and not questions:
         raise ValueError("No complete questions could be extracted; inspect the past-paper text/OCR")
     _assign_topics(questions, topics)
     years_by_topic = defaultdict(set)

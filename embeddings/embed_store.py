@@ -1,8 +1,8 @@
 """
 embeddings/embed_store.py
 
-Handles turning chunk text into vectors (via Ollama's local embedding
-model) and storing/querying them in a persistent ChromaDB collection.
+Embeds text with a small CPU model (or optional Ollama) and stores/query
+vectors in a persistent, provider-specific ChromaDB collection.
 """
 
 import os
@@ -20,7 +20,19 @@ load_dotenv()
 EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./db/chroma_store")
 MODE = os.getenv("MODE", "local").lower()
+EMBED_PROVIDER = os.getenv("EMBED_PROVIDER", "fastembed").lower()
+FASTEMBED_MODEL = os.getenv("FASTEMBED_MODEL", "BAAI/bge-small-en-v1.5")
+if EMBED_PROVIDER not in {"fastembed", "ollama"}:
+    raise ValueError("EMBED_PROVIDER must be fastembed or ollama")
+
+
+def embedding_identity() -> str:
+    return f"{EMBED_PROVIDER}:{FASTEMBED_MODEL if EMBED_PROVIDER == 'fastembed' else EMBED_MODEL}"
+
+
 COLLECTION_NAME = "exam_prep_demo" if MODE == "demo" else "exam_prep"
+if EMBED_PROVIDER == "fastembed":
+    COLLECTION_NAME += "_" + hashlib.sha256(embedding_identity().encode()).hexdigest()[:10]
 
 @lru_cache(maxsize=1)
 def _client():
@@ -30,17 +42,27 @@ def _client():
 def get_collection():
     """Returns (creating if needed) the shared Chroma collection."""
     collection = _client().get_or_create_collection(name=COLLECTION_NAME)
-    expected = "all-MiniLM-L6-v2" if MODE == "demo" else EMBED_MODEL
+    expected = embedding_identity()
     stored = (collection.metadata or {}).get("embedding_model")
-    if stored and stored != expected:
+    accepted = {expected, EMBED_MODEL} if EMBED_PROVIDER == "ollama" else {expected}
+    if stored and stored not in accepted:
         raise ValueError("Embedding model changed. Use a new CHROMA_DB_PATH and re-index your files.")
     if not stored:
         # Existing indices were created using nomic locally / MiniLM in demo mode.
         legacy = "all-MiniLM-L6-v2" if MODE == "demo" else "nomic-embed-text"
-        if collection.count() and expected != legacy:
+        if collection.count() and (EMBED_PROVIDER != "ollama" or EMBED_MODEL != legacy):
             raise ValueError("Existing vectors use a different embedding model; choose a new CHROMA_DB_PATH.")
         collection.modify(metadata={**(collection.metadata or {}), "embedding_model": expected})
+    # The old index tagged its model without a provider prefix.
     return collection
+
+
+@lru_cache(maxsize=1)
+def cpu_model():
+    report("Loading the free CPU embedding model", 0.2)
+    from fastembed import TextEmbedding
+    return TextEmbedding(model_name=FASTEMBED_MODEL, cache_dir=os.getenv("MODEL_CACHE_PATH", "./db/model_cache"),
+                         threads=min(4, max(1, (os.cpu_count() or 2) // 2)))
 
 
 def embed_many(texts: list[str]) -> list[list[float]]:
@@ -48,7 +70,7 @@ def embed_many(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     check_cancelled()
-    namespace = "embedding:" + ("all-MiniLM-L6-v2" if MODE == "demo" else EMBED_MODEL)
+    namespace = "embedding:" + embedding_identity()
     keys = [hashlib.sha256(text.encode()).hexdigest() for text in texts]
     saved = cache.get_many(namespace, keys)
     vectors = [saved.get(key) for key in keys]
@@ -57,12 +79,8 @@ def embed_many(texts: list[str]) -> list[list[float]]:
         return vectors
     by_key = dict(zip(keys, texts))
     inputs = [by_key[key] for key in missing]
-    if MODE == "demo":
-        from sentence_transformers import SentenceTransformer
-        global _demo_model
-        if _demo_model is None:
-            _demo_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-        generated = _demo_model.encode(inputs, normalize_embeddings=True).tolist()
+    if EMBED_PROVIDER == "fastembed":
+        generated = [vector.tolist() for vector in cpu_model().embed(inputs, batch_size=32)]
     else:
         import ollama
         client = ollama.Client(host=os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434"), timeout=180)
@@ -76,9 +94,6 @@ def embed_many(texts: list[str]) -> list[list[float]]:
 
 def embed_text(text: str) -> List[float]:
     return embed_many([text])[0]
-
-
-_demo_model = None
 
 
 def store_chunks(chunk_records: List[Dict[str, Any]]) -> int:

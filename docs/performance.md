@@ -46,4 +46,12 @@ Read endpoint medians in the final audit were approximately 3 ms for health, 5 m
 - The queue supports one backend process. Multiple workers or shared public uploads need a separate job system, storage, authentication, and tenant isolation.
 - SQLite and Chroma are separate stores. A process crash during the final file commit can still require re-indexing that source; the next upload reconciles its passages.
 
-At verification time Ollama was offline and no Groq key had been added. Real model latency and the new generation quality were therefore not benchmarked. Use `scripts/audit_performance.py` for work sizes and **Settings & activity** for timings once inference is configured.
+## Follow-up verification, 15 October 2026
+
+Uploads now use FastEmbed's small BGE model on the CPU, independently of Ollama. Its first download is about 67 MB. Provider-specific collections keep the new 384-dimensional vectors separate from the old index. Existing extracted pages rebuild the new search index on demand.
+
+A real end-to-end test used synthetic DBMS slides, two dated papers, the cached CPU embedding model, and Groq `openai/gpt-oss-20b`. PPTX upload took 1.06 seconds, teaching-only topic analysis 2.28 seconds (two model calls), two MCQs 1.25 seconds, and one 3-mark question 1.89 seconds. Adding two tiny paper files took 0.22 seconds; analysis with those papers took 2.06 seconds (four model calls and two cache hits). Normalization was correctly grouped across 2023 and 2024. Correct MCQ grading, written self-assessment, and restoring submitted answers passed. These tiny-corpus timings do not predict full textbook performance.
+
+Groq requests now include an application User-Agent; the previous default urllib request received HTTP 403 even with a configured key. The frontend lockfile was regenerated from a clean directory because `npm ci` on Linux rejected missing optional WASM dependencies. Actions now use Node 24-compatible releases.
+
+Use `scripts/audit_performance.py` for work sizes and **Settings & activity** for timings on your actual course.

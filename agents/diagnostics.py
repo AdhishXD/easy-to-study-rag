@@ -7,17 +7,18 @@ from urllib.request import urlopen
 
 from agents.llm import LOG_PATH, TRACE_PATH
 from agents.llm import provider_settings
+from embeddings.embed_store import EMBED_PROVIDER, embedding_identity
 
 
 def model_status() -> dict:
     provider, model = provider_settings()
     if provider == "groq":
         return {"provider": "Groq", "model": model, "key_configured": bool(os.getenv("GROQ_API_KEY")),
-                "embed_model": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")}
+                "embed_model": embedding_identity(), "embed_provider": EMBED_PROVIDER}
     host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
     result = {"provider": "Ollama", "host": host,
               "chat_model": model,
-              "embed_model": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")}
+              "embed_model": embedding_identity(), "embed_provider": EMBED_PROVIDER}
     try:
         with urlopen(host + "/api/tags", timeout=3) as response:
             payload = json.load(response)

@@ -84,7 +84,8 @@ def chat(prompt: str, *, cache: bool = True, max_tokens: int = 1800) -> str:
                 payload["reasoning_effort"] = "low"
             request = Request(
                 "https://api.groq.com/openai/v1/chat/completions", data=json.dumps(payload).encode(),
-                headers={"Authorization": f"Bearer {key_value}", "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {key_value}", "Content-Type": "application/json",
+                         "User-Agent": "EasyToStudy/0.2"},
             )
             for attempt in range(3):
                 check_cancelled()

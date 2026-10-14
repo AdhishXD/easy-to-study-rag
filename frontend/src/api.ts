@@ -49,7 +49,11 @@ export type QuizQuestion = {
   question_type: string
   topic: string
 }
-export type Quiz = { quiz_id: string; questions: QuizQuestion[] }
+export type Quiz = {
+  quiz_id: string
+  questions: QuizQuestion[]
+  attempts?: { question_index: number; correct: boolean; answer: string }[]
+}
 export type Job = {
   id: string
   subject: string

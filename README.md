@@ -6,7 +6,7 @@ Built with **React + TypeScript + Tailwind**, **FastAPI**, local **Chroma**, and
 
 ## Run locally
 
-Use Python 3.12 and Node.js 22 or newer. Create a fresh environment on a new machine:
+Use Python 3.12 and Node.js 24. Create a fresh environment on a new machine:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -14,8 +14,7 @@ py -3.12 -m venv .venv
 python -m pip install -r requirements-local.txt
 # Copy only if you do not already have .env:
 Copy-Item .env.example .env
-ollama pull qwen2.5:7b
-ollama pull nomic-embed-text
+# Add GROQ_API_KEY to .env for Groq, or install Ollama for local generation.
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -43,9 +42,11 @@ GROQ_API_KEY=your_key_here
 GROQ_MODEL=openai/gpt-oss-20b
 ```
 
-The key stays on the backend. Retrieved teaching text and analysis passages are sent to Groq when that provider is selected. Free quotas still apply. Rate limits are retried with a bounded wait; the UI reports failures instead of inventing results. Local embeddings continue to use Ollama, independently of the chat provider.
+The key stays on the backend. Retrieved teaching text and analysis passages are sent to Groq when that provider is selected. Free quotas still apply. Rate limits are retried with a bounded wait; the UI reports failures instead of inventing results.
 
-The local default preserves the existing `qwen2.5:7b` installation. For a lighter candidate, pull `qwen3:4b`, set `OLLAMA_LLM_MODEL=qwen3:4b`, and compare question quality on the same course pages. Thinking is disabled by default for models that support that setting. A model name alone does not guarantee faster inference on your hardware.
+Uploads and search use **FastEmbed on the CPU** by default (`BAAI/bge-small-en-v1.5`, 384 dimensions). The first upload downloads approximately 67 MB to the ignored `db/model_cache/`; subsequent uploads reuse it. Ollama is not required for embeddings. Existing saved pages are automatically indexed with the new embedding model when practice first needs them; the old index remains separate. To use Ollama embeddings instead, set `EMBED_PROVIDER=ollama` and pull `nomic-embed-text`.
+
+For local generation, run `ollama pull qwen2.5:7b` and start Ollama. For a lighter candidate, pull `qwen3:4b`, set `OLLAMA_LLM_MODEL=qwen3:4b`, and compare question quality on the same course pages. Thinking is disabled by default for models that support that setting. A model name alone does not guarantee faster inference on your hardware.
 
 ## Study workflow
 
@@ -53,9 +54,9 @@ The local default preserves the existing `qwen2.5:7b` installation. For a lighte
 2. Add notes, textbooks, recordings, and dated past papers. Documents support PDF, PPTX with speaker notes, PPT, DOCX, TXT, and MD. Recordings support MP4, MP3, WAV, M4A, and WEBM.
 3. Inspect the saved page text in **Materials**. Legacy PPT needs LibreOffice; scanned or handwritten PDFs need OCR. Formats without a loader are rejected clearly.
 4. Check exam years. Years in filenames take priority over the fallback year. Existing paper years can be corrected in the library.
-5. Analyze the course. Jobs run in the background, show progress, and can be cancelled between processing steps. A current model request or file commit may finish before cancellation takes effect.
+5. Analyze the course. Teaching material alone is enough for a topic map and practice; dated past papers add recurrence evidence. Jobs run in the background, show progress, and can be cancelled between processing steps. A current model request or file commit may finish before cancellation takes effect.
 6. Explore topics, complete past-paper questions, and candidate repeats with original source text.
-7. Generate a practice set. MCQs are checked on the backend; written answers use self-assessment. Progress shows topics that need another look.
+7. Generate a practice set. MCQs are checked on the backend; written answers use self-assessment. The latest set and submitted answers are restored per subject, and drafts survive navigation and refresh in the current browser session. Progress shows topics that need another look.
 
 The materials library can remove incorrectly assigned files. Removal clears that course's saved analysis. Subjects isolate course material; this is a local workspace, not a multi-user account system.
 

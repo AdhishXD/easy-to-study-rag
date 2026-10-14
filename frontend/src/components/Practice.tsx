@@ -13,6 +13,47 @@ import { useEffect, useState } from 'react'
 import { post, type Analysis, type Quiz } from '../api'
 import { Empty } from './Common'
 
+type PracticeState = {
+  index: number
+  answers: Record<number, string>
+  results: Record<number, { correct: boolean }>
+  revealed: Record<number, boolean>
+}
+
+function restore(quiz: Quiz | null): PracticeState {
+  let state: PracticeState = {
+    index: 0,
+    answers: {},
+    results: {},
+    revealed: {},
+  }
+  if (!quiz) return state
+  try {
+    const saved = JSON.parse(
+      sessionStorage.getItem(`practice:${quiz.quiz_id}`) || 'null',
+    )
+    if (saved)
+      state = {
+        index:
+          Number.isInteger(saved.index) &&
+          saved.index >= 0 &&
+          saved.index < quiz.questions.length
+            ? saved.index
+            : 0,
+        answers: saved.answers || {},
+        results: saved.results || {},
+        revealed: saved.revealed || {},
+      }
+  } catch {
+    /* A new session can still restore submitted answers from the server. */
+  }
+  for (const attempt of quiz.attempts || []) {
+    state.answers[attempt.question_index] = attempt.answer
+    state.results[attempt.question_index] = { correct: attempt.correct }
+  }
+  return state
+}
+
 export function Practice({
   analysis,
   quiz,
@@ -30,37 +71,50 @@ export function Practice({
   onAnswer: () => void
   citation: (filename: string, page?: number) => void
 }) {
-  const [topic, setTopic] = useState('')
-  const [kind, setKind] = useState('mcq')
-  const [count, setCount] = useState(3)
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, string>>({})
-  const [results, setResults] = useState<Record<number, { correct: boolean }>>(
-    {},
+  const [topic, setTopic] = useState(
+    quiz?.questions[0]?.topic || analysis?.topics[0]?.name || '',
   )
-  const [revealed, setRevealed] = useState<Record<number, boolean>>({})
+  const [kind, setKind] = useState(quiz?.questions[0]?.question_type || 'mcq')
+  const [count, setCount] = useState(3)
+  const [initial] = useState(() => restore(quiz))
+  const [index, setIndex] = useState(initial.index)
+  const [answers, setAnswers] = useState<Record<number, string>>(
+    initial.answers,
+  )
+  const [results, setResults] = useState<Record<number, { correct: boolean }>>(
+    initial.results,
+  )
+  const [revealed, setRevealed] = useState<Record<number, boolean>>(
+    initial.revealed,
+  )
   const [saving, setSaving] = useState(false)
   useEffect(() => {
-    setIndex(0)
-    setAnswers({})
-    setResults({})
-    setRevealed({})
-  }, [quiz?.quiz_id])
-  useEffect(() => {
-    setTopic(analysis?.topics[0]?.name || '')
-  }, [analysis?.subject, analysis?.generated_at])
+    if (!quiz) return
+    try {
+      sessionStorage.setItem(
+        `practice:${quiz.quiz_id}`,
+        JSON.stringify({ index, answers, results, revealed }),
+      )
+    } catch {
+      /* Submitted answers remain saved on the backend. */
+    }
+  }, [quiz, index, answers, results, revealed])
   const question = quiz?.questions[index]
   const submit = async (self_correct?: boolean) => {
     if (!quiz) return
     setSaving(true)
     try {
-      const result = await post<{ correct: boolean }>('/attempts', {
-        quiz_id: quiz.quiz_id,
-        question_index: index,
-        answer: answers[index] || '',
-        self_correct,
-      })
+      const result = await post<{ correct: boolean; selected_answer: string }>(
+        '/attempts',
+        {
+          quiz_id: quiz.quiz_id,
+          question_index: index,
+          answer: answers[index] || '',
+          self_correct,
+        },
+      )
       setResults((current) => ({ ...current, [index]: result }))
+      setAnswers((current) => ({ ...current, [index]: result.selected_answer }))
       onAnswer()
     } catch (error) {
       notify(error)
@@ -73,7 +127,7 @@ export function Practice({
       <Empty
         icon={<Target size={28} />}
         title="Practice starts with understanding"
-        text="Analyze your teaching material and past papers first. Then choose a topic for questions grounded in your course."
+        text="Analyze your teaching material first. Then choose a topic for questions grounded in your course. Past papers are optional for practice."
       />
     )
   return (

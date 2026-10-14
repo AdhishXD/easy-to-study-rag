@@ -9,7 +9,7 @@ import re
 from ingestion.chunker import chunk_pages
 from ingestion.document_loader import DOCUMENT_EXTENSIONS, load_document
 from ingestion.source_store import replace_pages, source_fingerprint, register_source
-from embeddings.embed_store import store_chunks, delete_source_vectors
+from embeddings.embed_store import store_chunks, delete_source_vectors, embedding_identity, COLLECTION_NAME, CHROMA_DB_PATH, get_collection
 from agents.runtime import report, check_cancelled
 
 VIDEO_EXTENSIONS = {".mp4", ".mp3", ".wav", ".m4a", ".webm"}
@@ -42,7 +42,7 @@ def ingest_file(path: str | Path, source_type: str, *, subject: str,
             raise ValueError(f"A valid exam year is required for {path.name}")
     digest = hashlib.sha256()
     digest.update(json.dumps({"version": 2, "chunks": [700, 100],
-                              "embed": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
+                              "embed": embedding_identity(),
                               "mode": os.getenv("MODE", "local"),
                               "store": os.getenv("CHROMA_DB_PATH", "./db/chroma_store"),
                               "whisper": os.getenv("WHISPER_MODEL_SIZE", "base"),
@@ -81,3 +81,30 @@ def ingest_file(path: str | Path, source_type: str, *, subject: str,
     register_source(subject, source_type, path.name, fingerprint, count, year)
     report(f"Indexed {path.name}", 1)
     return count
+
+
+def ensure_subject_index(subject: str) -> None:
+    """Rebuild a provider-specific index from saved pages without re-uploading files."""
+    from collections import defaultdict
+    from agents import cache
+    from ingestion.source_store import get_pages, corpus_fingerprint
+    pages = get_pages(subject)
+    if not pages:
+        return
+    namespace = f"subject-index:{Path(CHROMA_DB_PATH).resolve()}:{COLLECTION_NAME}"
+    fingerprint = corpus_fingerprint(pages)
+    indexed = get_collection().get(where={"subject": subject}, limit=1, include=[])["ids"]
+    if indexed and cache.get(namespace, subject) == fingerprint:
+        return
+    report("Preparing the course search index with the current embedding model", 0.05)
+    files = defaultdict(list)
+    for page in pages:
+        files[(page["source_type"], page["filename"], page["year"])].append((page["page"], page["text"]))
+    for (kind, filename, year), text in files.items():
+        metadata = {"subject": subject}
+        if year is not None:
+            metadata["year"] = year
+        chunks = chunk_pages(text, kind, filename, extra_metadata=metadata)
+        store_chunks(chunks)
+        delete_source_vectors(subject, kind, filename, keep_ids=[c["id"] for c in chunks])
+    cache.put(namespace, subject, fingerprint)

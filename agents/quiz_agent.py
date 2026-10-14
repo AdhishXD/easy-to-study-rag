@@ -6,6 +6,7 @@ from typing import Any
 from agents.llm import chat
 from embeddings.embed_store import query
 from ingestion.source_store import get_source_pages
+from ingestion.pipeline import ensure_subject_index
 
 TEACHING_SOURCE_TYPES = ["textbook", "lecture_note", "lecture_slide", "lecture_video"]
 QUESTION_TYPES = {"mcq", "2_mark", "3_mark", "5_mark"}
@@ -13,6 +14,8 @@ QUESTION_TYPES = {"mcq", "2_mark", "3_mark", "5_mark"}
 
 def retrieve_context_for_topic(topic: str, n_results: int = 5,
                                subject: str | None = None) -> list[dict[str, Any]]:
+    if subject:
+        ensure_subject_index(subject)
     filters: list[dict[str, Any]] = [
         {"source_type": {"$in": TEACHING_SOURCE_TYPES}}
     ]
@@ -76,7 +79,11 @@ def generate_questions_for_topic(topic: str, num_questions: int = 3,
         return []
     format_rule = (
         'For each item provide "question", "options" (exactly four distinct strings), '
-        '"correct_answer" (identical to one option), and "explanation".'
+        '"correct_answer" (identical to one option), and "explanation". '
+        'Exactly ONE option must be correct. Distractors must be clearly false under the supplied context, '
+        'not paraphrases, subsets, or consequences of the correct option. Avoid ambiguous choices '
+        'where a broad claim and a more specific true claim would both answer the question. '
+        'Check every option against the context before returning it.'
         if question_type == "mcq" else
         'For each item provide "question", "correct_answer" (a model answer), and "explanation".'
     )

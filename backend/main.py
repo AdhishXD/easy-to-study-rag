@@ -21,12 +21,12 @@ from agents.llm import provider_settings
 from agents.quiz_agent import generate_questions_for_topic
 from agents.runtime import report, JobCancelled, current_run
 from backend.jobs import JobManager
-from backend.practice import save_quiz, answer_question, progress
+from backend.practice import save_quiz, answer_question, progress, latest_quiz
 from ingestion.pipeline import ingest_file, SOURCE_TYPES, extract_year
 from ingestion.document_loader import DOCUMENT_EXTENSIONS
 from ingestion.source_store import list_subjects, create_subject, list_files, get_pages, delete_source_pages
 from ingestion.source_store import get_source_pages, page_numbers, set_source_year
-from embeddings.embed_store import delete_source_vectors, get_collection
+from embeddings.embed_store import delete_source_vectors, get_collection, embedding_identity, EMBED_PROVIDER
 
 DEMO = os.getenv("MODE", "local").lower() == "demo"
 security = HTTPBearer(auto_error=False)
@@ -105,6 +105,7 @@ def health():
 def config():
     provider, model = provider_settings()
     return {"demo": DEMO, "provider": provider, "model": model, "uploads_enabled": not DEMO,
+            "embedding_provider": EMBED_PROVIDER, "embedding_model": embedding_identity(),
             "max_upload_mb": int(os.getenv("MAX_UPLOAD_MB", "100"))}
 
 
@@ -244,6 +245,12 @@ def upload_files(subject: str = Form(...), source_type: str = Form(...), year: i
     finally:
         for file in files:
             file.file.close()
+
+
+@app.get("/api/quizzes/latest")
+def resume_quiz(subject: str):
+    subject_exists(subject)
+    return latest_quiz(subject)
 
 
 @app.post("/api/quizzes", status_code=202)
