@@ -1,7 +1,7 @@
 
 # Chunking. PDFs, PPTX and past QPs are made into flat list of chunks, tagged with metadata. 
 
-import uuid
+import hashlib
 from typing import List, Tuple, Dict, Any
 
 CHUNK_SIZE = 700       # characters per chunk
@@ -10,19 +10,26 @@ CHUNK_OVERLAP = 100    # characters shared between consecutive chunks
 
 def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
     """Plain sliding-window string splitter. No API call needed."""
-    if chunk_overlap >= chunk_size:
-        raise ValueError("chunk_overlap must be smaller than chunk_size")
+    if chunk_size <= 0 or chunk_overlap < 0 or chunk_overlap >= chunk_size:
+        raise ValueError("chunk_size must be positive and overlap must be in [0, chunk_size)")
 
     chunks = []
     start = 0
     text_length = len(text)
 
     while start < text_length:
-        end = start + chunk_size
+        end = min(start + chunk_size, text_length)
+        if end < text_length:
+            boundary = max(text.rfind("\n", start + chunk_size // 2, end),
+                           text.rfind(" ", start + chunk_size // 2, end))
+            if boundary > start:
+                end = boundary + 1
         piece = text[start:end].strip()
         if piece:
             chunks.append(piece)
-        start += chunk_size - chunk_overlap
+        if end == text_length:
+            break
+        start = end - chunk_overlap
 
     return chunks
 
@@ -54,7 +61,7 @@ def chunk_pages(
 
     for page_num, page_text in pages:
         pieces = _split_text(page_text, chunk_size, chunk_overlap)
-        for piece in pieces:
+        for chunk_index, piece in enumerate(pieces):
             metadata = {
                 "source_type": source_type,
                 "filename": filename,
@@ -63,7 +70,9 @@ def chunk_pages(
             }
             records.append(
                 {
-                    "id": str(uuid.uuid4()),
+                    "id": hashlib.sha256(
+                        f"{source_type}:{filename}:{metadata.get('subject', '')}:{page_num}:{chunk_index}".encode("utf-8")
+                    ).hexdigest(),
                     "text": piece,
                     "metadata": metadata,
                 }

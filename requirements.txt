@@ -1,21 +1,9 @@
-# --- Core RAG stack (all free/local) ---
 chromadb
-ollama
-
-# --- File parsing ---
-pypdf
 pdfplumber
 python-pptx
-
-# --- Lecture video transcription ---
-faster-whisper
-
-# --- Agent orchestration ---
-crewai
-
-# --- Pattern analysis ---
+python-docx
 pandas
 scikit-learn
-
-# --- Utilities ---
 python-dotenv
+streamlit
+sentence-transformers

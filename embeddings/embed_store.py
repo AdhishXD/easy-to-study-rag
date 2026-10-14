@@ -9,14 +9,14 @@ import os
 from typing import List, Dict, Any, Optional
 
 import chromadb
-import ollama
 from dotenv import load_dotenv
 
 load_dotenv()
 
 EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./db/chroma_store")
-COLLECTION_NAME = "exam_prep"
+MODE = os.getenv("MODE", "local").lower()
+COLLECTION_NAME = "exam_prep_demo" if MODE == "demo" else "exam_prep"
 
 _chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
 
@@ -27,9 +27,24 @@ def get_collection():
 
 
 def embed_text(text: str) -> List[float]:
-    """Calls Ollama's local embedding model for a single piece of text."""
-    response = ollama.embeddings(model=EMBED_MODEL, prompt=text)
+    """Use Ollama locally, or a small CPU embedding model in hosted demo mode."""
+    if MODE == "demo":
+        from sentence_transformers import SentenceTransformer
+        global _demo_model
+        if _demo_model is None:
+            _demo_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        return _demo_model.encode(text, normalize_embeddings=True).tolist()
+    import ollama
+    try:
+        response = ollama.embeddings(model=EMBED_MODEL, prompt=text)
+    except Exception:
+        from agents.llm import logger
+        logger.exception("embedding_failed model=%s text_chars=%d", EMBED_MODEL, len(text))
+        raise
     return response["embedding"]
+
+
+_demo_model = None
 
 
 def store_chunks(chunk_records: List[Dict[str, Any]]) -> int:
@@ -55,7 +70,7 @@ def store_chunks(chunk_records: List[Dict[str, Any]]) -> int:
         metadatas.append(record["metadata"])
 
     if ids:
-        collection.add(
+        collection.upsert(
             ids=ids,
             documents=documents,
             embeddings=embeddings,
@@ -82,11 +97,13 @@ def query(
         Raw ChromaDB query result (documents, metadatas, distances).
     """
     collection = get_collection()
+    if collection.count() == 0:
+        return {"documents": [[]], "metadatas": [[]], "distances": [[]], "ids": [[]]}
     query_vector = embed_text(query_text)
 
     return collection.query(
         query_embeddings=[query_vector],
-        n_results=n_results,
+        n_results=min(n_results, collection.count()),
         where=where,
     )
 
@@ -94,6 +111,24 @@ def query(
 def collection_count() -> int:
     """Returns how many chunks are currently stored."""
     return get_collection().count()
+
+
+def get_by_filter(where: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fetches ALL chunks matching a metadata filter — no similarity
+    search, no embedding call. Used by analysis steps (like the
+    Pattern Agent) that need every matching chunk, not just the
+    top-k most similar to some query.
+
+    Args:
+        where: Chroma metadata filter, e.g. {"source_type": "past_qp"}
+
+    Returns:
+        Flat dict with "documents" and "metadatas" lists (not nested
+        like query() results, since there's no per-query grouping here).
+    """
+    collection = get_collection()
+    return collection.get(where=where)
 
 
 if __name__ == "__main__":
