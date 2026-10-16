@@ -50,15 +50,19 @@ For local generation, run `ollama pull qwen2.5:7b` and start Ollama. For a light
 
 ## Study workflow
 
-1. Create one subject per course.
+1. Open **My subjects** to see and search your courses. Create one subject per course.
 2. Add notes, textbooks, recordings, and dated past papers. Documents support PDF, PPTX with speaker notes, PPT, DOCX, TXT, and MD. Recordings support MP4, MP3, WAV, M4A, and WEBM.
-3. Inspect the saved page text in **Materials**. Legacy PPT needs LibreOffice; scanned or handwritten PDFs need OCR. Formats without a loader are rejected clearly.
+3. Open a source in **Materials** or from a citation. PDFs open at the referenced original page with zoom and page navigation; switch to **Extracted text** to inspect what the model can read. Legacy PPT needs LibreOffice; scanned or handwritten PDFs need OCR. Formats without a loader are rejected clearly.
 4. Check exam years. Years in filenames take priority over the fallback year. Existing paper years can be corrected in the library.
 5. Analyze the course. Teaching material alone is enough for a topic map and practice; dated past papers add recurrence evidence. Jobs run in the background, show progress, and can be cancelled between processing steps. A current model request or file commit may finish before cancellation takes effect.
 6. Explore topics, complete past-paper questions, and candidate repeats with original source text.
 7. Generate a practice set. MCQs are checked on the backend; written answers use self-assessment. The latest set and submitted answers are restored per subject, and drafts survive navigation and refresh in the current browser session. Progress shows topics that need another look.
 
 The materials library can remove incorrectly assigned files. Removal clears that course's saved analysis. Subjects isolate course material; this is a local workspace, not a multi-user account system.
+
+Original PDFs are retained in the ignored `db/originals/` directory (`ORIGINALS_PATH`). Identical PDF bytes share one stored file, including across subjects. Removing or replacing a source removes its old PDF only after the last reference is gone. Older uploads without an original retain the text reader; upload the same PDF again to restore preview. Presentations and recordings continue to use extracted text.
+
+The PDF.js viewer loads on demand, renders only the selected page, and releases the document on close. Authenticated byte-range responses allow partial downloads; fonts and decoders are served locally. No page screenshots are stored, and opening a PDF makes no model calls. `npm run dev` and `npm run build` prepare the PDF viewer assets automatically.
 
 ## Performance and grounding
 

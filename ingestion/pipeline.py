@@ -9,6 +9,7 @@ import re
 from ingestion.chunker import chunk_pages
 from ingestion.document_loader import DOCUMENT_EXTENSIONS, load_document
 from ingestion.source_store import replace_pages, source_fingerprint, register_source
+from ingestion.original_store import save_original
 from embeddings.embed_store import store_chunks, delete_source_vectors, embedding_identity, COLLECTION_NAME, CHROMA_DB_PATH, get_collection
 from agents.runtime import report, check_cancelled
 
@@ -54,6 +55,7 @@ def ingest_file(path: str | Path, source_type: str, *, subject: str,
     fingerprint = digest.hexdigest()
     previous = source_fingerprint(subject, source_type, path.name)
     if previous and previous[0] == fingerprint and previous[2] == year:
+        save_original(path, subject, source_type)
         report(f"{path.name} is already indexed; reused its passages", 1)
         return previous[1]
     report(f"Reading {path.name}", 0.1)
@@ -79,6 +81,7 @@ def ingest_file(path: str | Path, source_type: str, *, subject: str,
     delete_source_vectors(subject, source_type, path.name, keep_ids=[c["id"] for c in chunks])
     replace_pages(subject.strip(), source_type, path.name, pages, year)
     register_source(subject, source_type, path.name, fingerprint, count, year)
+    save_original(path, subject, source_type)
     report(f"Indexed {path.name}", 1)
     return count
 

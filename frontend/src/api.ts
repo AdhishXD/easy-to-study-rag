@@ -95,6 +95,11 @@ export const query = (values: Record<string, string | number>) =>
 const base =
   (import.meta as ImportMeta & { env: Record<string, string> }).env
     .VITE_API_URL || ''
+export const apiUrl = (path: string) => `${base}/api${path}`
+export const authHeaders = (): Record<string, string> => {
+  const token = sessionStorage.getItem('workspace-token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 export async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -104,7 +109,7 @@ export async function api<T>(
     headers.set('Content-Type', 'application/json')
   const token = sessionStorage.getItem('workspace-token')
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  const response = await fetch(`${base}/api${path}`, { ...options, headers })
+  const response = await fetch(apiUrl(path), { ...options, headers })
   if (!response.ok) {
     let message = `Request failed (${response.status})`
     try {

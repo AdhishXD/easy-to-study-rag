@@ -1090,6 +1090,179 @@ h1 {
   border-radius: 0.5rem;
   margin-top: 0.5rem;
 }
+.subjects-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1.25rem;
+}
+.subject-card {
+  text-align: left;
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid #e4e9ef;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 3px 12px #23354b03;
+}
+.subject-card:hover {
+  border-color: #b7c8d8;
+  box-shadow: 0 6px 24px #23354b08;
+}
+.subject-card-top,
+.subject-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  color: #8798a9;
+}
+.subject-card-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.85rem;
+  background: #edf2f7;
+  color: #49647e;
+}
+.subject-card h2 {
+  margin: 1.6rem 0 0.7rem;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.subject-card p {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #7b8c9c;
+  font-size: 0.75rem;
+}
+.subject-card-footer {
+  margin-top: 1.7rem;
+  border-top: 1px solid #edf0f4;
+  padding-top: 1rem;
+  font-size: 0.65rem;
+  flex-wrap: wrap;
+}
+.subject-card-footer span:last-child {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  color: #47627e;
+}
+.breadcrumb button {
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 0.3rem 0;
+}
+.breadcrumb button:hover {
+  color: #2e4358;
+}
+.reader-tabs {
+  display: inline-flex;
+  margin: 1.2rem 0 0.5rem;
+  padding: 0.25rem;
+  border-radius: 0.65rem;
+  background: #eaf0f5;
+  gap: 0.2rem;
+}
+.reader-tabs button {
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  color: #62788d;
+}
+.reader-tabs button.active {
+  background: #fff;
+  color: #2e4358;
+  box-shadow: 0 1px 5px #23354b0a;
+}
+.reader-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.8rem 0;
+}
+.reader-page-controls,
+.reader-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.reader-page-controls label {
+  font-size: 0.65rem;
+  color: #62788d;
+}
+.reader-page-controls select {
+  border: 1px solid #dce4ed;
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0.4rem;
+  max-width: 5rem;
+  margin-left: 0.3rem;
+}
+.reader-message {
+  font-size: 0.75rem;
+  line-height: 1.7;
+  padding: 0.85rem;
+  margin-top: 0.8rem;
+  border-radius: 0.55rem;
+  background: #edf2f7;
+  color: #526a80;
+}
+.pdf-viewport {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-height: 66vh;
+  overflow: auto;
+  background: #e8edf2;
+  border: 1px solid #dde5ee;
+  border-radius: 0.65rem;
+  min-height: 12rem;
+}
+.pdf-canvas-host {
+  padding: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.pdf-canvas-host canvas {
+  display: block;
+  margin: auto;
+  background: #fff;
+  box-shadow: 0 2px 8px #152a4212;
+}
+.pdf-status {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  background: #f5f8fbea;
+  color: #536d84;
+  font-size: 0.75rem;
+}
+.main-shell,
+.main-content,
+.source-reader {
+  min-width: 0;
+}
 .practice-controls {
   display: flex;
   align-items: flex-end;

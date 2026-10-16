@@ -4,8 +4,10 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/pdf-assets.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
+    "prebuild": "node scripts/pdf-assets.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "format": "prettier --write src vite.config.ts",
     "format:check": "prettier --check src vite.config.ts"
@@ -13,6 +15,7 @@
   "dependencies": {
     "lucide-react": "^0.468.0",
     "motion": "^12.0.0",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

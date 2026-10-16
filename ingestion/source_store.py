@@ -97,11 +97,13 @@ def register_source(subject: str, kind: str, filename: str, fingerprint: str, ch
 
 
 def delete_source_pages(subject: str, kind: str, filename: str) -> None:
+    from ingestion.original_store import remove_original
     with closing(_connect()) as db, db:
         db.execute("DELETE FROM source_pages WHERE subject=? AND source_type=? AND filename=?", (subject, kind, filename))
         db.execute("DELETE FROM source_files WHERE subject=? AND source_type=? AND filename=?", (subject, kind, filename))
         db.execute("CREATE TABLE IF NOT EXISTS analyses (subject TEXT PRIMARY KEY, payload TEXT NOT NULL)")
         db.execute("DELETE FROM analyses WHERE subject=?", (subject,))
+    remove_original(subject, kind, filename)
 
 
 def corpus_fingerprint(pages: list[dict]) -> str:

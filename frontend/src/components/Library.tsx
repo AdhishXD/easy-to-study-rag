@@ -109,7 +109,7 @@ export function Library({
                 className="button quiet inspect-button"
                 onClick={() => open(m)}
               >
-                View text
+                View source
                 <ChevronRight size={14} />
               </button>
               {!demo && m.source_type === 'past_qp' && (

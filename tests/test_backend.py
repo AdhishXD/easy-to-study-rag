@@ -24,6 +24,7 @@ class IsolatedTests(unittest.TestCase):
         self.root = Path(self.directory.name)
         self.stack = ExitStack()
         self.stack.enter_context(patch.dict(os.environ, {"CACHE_DB_PATH": str(self.root / "runtime.sqlite3"),
+                                                       "ORIGINALS_PATH": str(self.root / "originals"),
                                                        "LLM_PROVIDER": "ollama", "OLLAMA_LLM_MODEL": "qwen2.5:7b",
                                                        "APP_ACCESS_TOKEN": "", "LOG_LLM_CONTENT": "0"}))
         self.stack.enter_context(patch("ingestion.source_store.DB_PATH", self.root / "pages.sqlite3"))
@@ -172,6 +173,81 @@ class IsolatedTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()[0]["text"], "Database normal forms")
             self.assertEqual(len(response.json()), 1)
+
+    def test_original_pdf_deduplication_replacement_and_delete(self):
+        from ingestion.original_store import save_original, get_original, remove_original
+        file = self.root / "notes.pdf"
+        file.write_bytes(b"%PDF-1.7\noriginal contents")
+        save_original(file, "DBMS", "lecture_note")
+        save_original(file, "Electrical", "textbook")
+        original = get_original("DBMS", "lecture_note", file.name)
+        self.assertEqual(original["path"], get_original("Electrical", "textbook", file.name)["path"])
+        self.assertEqual(len(list((self.root / "originals").glob("*.pdf"))), 1)
+        file.write_bytes(b"%PDF-1.7\nreplacement contents")
+        save_original(file, "DBMS", "lecture_note")
+        self.assertTrue(original["path"].exists())
+        self.assertNotEqual(original["path"], get_original("DBMS", "lecture_note", file.name)["path"])
+        remove_original("Electrical", "textbook", file.name)
+        self.assertFalse(original["path"].exists())
+        self.assertIsNotNone(get_original("DBMS", "lecture_note", file.name))
+        remove_original("DBMS", "lecture_note", file.name)
+        self.assertEqual(list((self.root / "originals").glob("*.pdf")), [])
+
+    def test_original_routes_require_auth_and_support_ranges(self):
+        from ingestion.original_store import save_original
+        file = self.root / "notes.pdf"
+        content = b"%PDF-1.7\n" + b"document contents " * 100
+        file.write_bytes(content)
+        source_store.replace_pages("DBMS", "lecture_note", file.name, [(1, "Database notes")])
+        source_store.create_subject("Electrical")
+        save_original(file, "DBMS", "lecture_note")
+        params = {"subject": "DBMS", "source_type": "lecture_note", "filename": file.name}
+        with patch.dict(os.environ, {"APP_ACCESS_TOKEN": "test-token"}), TestClient(app) as client:
+            self.assertEqual(client.get("/api/original", params=params).status_code, 401)
+            client.headers["Authorization"] = "Bearer test-token"
+            self.assertTrue(client.get("/api/original-info", params=params).json()["available"])
+            response = client.get("/api/original", params=params, headers={"Range": "bytes=0-7"})
+            self.assertEqual(response.status_code, 206)
+            self.assertEqual(response.content, content[:8])
+            self.assertEqual(response.headers["content-range"], f"bytes 0-7/{len(content)}")
+            self.assertEqual(response.headers["content-encoding"], "identity")
+            self.assertEqual(client.head("/api/original", params=params).headers["accept-ranges"], "bytes")
+            self.assertEqual(client.get("/api/original", params={**params, "subject": "Electrical"}).status_code, 404)
+            self.assertEqual(client.get("/api/original", params={**params, "filename": "../../.env"}).status_code, 404)
+
+    def test_old_upload_has_text_fallback_without_original(self):
+        source_store.replace_pages("DBMS", "lecture_note", "older.pdf", [(109, "Concurrent transactions")])
+        with TestClient(app) as client:
+            params = {"subject": "DBMS", "source_type": "lecture_note", "filename": "older.pdf"}
+            self.assertFalse(client.get("/api/original-info", params=params).json()["available"])
+            self.assertEqual(client.get("/api/original", params=params).status_code, 404)
+            self.assertEqual(client.get("/api/pages", params={**params, "page": 109}).json()[0]["text"], "Concurrent transactions")
+
+    def test_unchanged_pdf_restores_original_without_reembedding(self):
+        from ingestion.pipeline import ingest_file
+        from ingestion.original_store import get_original, remove_original
+        file = self.root / "notes.pdf"
+        file.write_bytes(b"%PDF-1.7\nplaceholder")
+        with patch("ingestion.pipeline.load_document", return_value=[(1, "Database normalization")]) as parse, \
+             patch("ingestion.pipeline.store_chunks", return_value=1) as store, patch("ingestion.pipeline.delete_source_vectors"):
+            ingest_file(file, "lecture_note", subject="DBMS")
+            remove_original("DBMS", "lecture_note", file.name)
+            ingest_file(file, "lecture_note", subject="DBMS")
+            self.assertIsNotNone(get_original("DBMS", "lecture_note", file.name))
+            parse.assert_called_once()
+            store.assert_called_once()
+
+    def test_failed_replacement_preserves_original(self):
+        from ingestion.pipeline import ingest_file
+        from ingestion.original_store import save_original, get_original
+        file = self.root / "notes.pdf"
+        file.write_bytes(b"%PDF-1.7\nold version")
+        save_original(file, "DBMS", "lecture_note")
+        original = get_original("DBMS", "lecture_note", file.name)
+        file.write_bytes(b"%PDF-1.7\nnew version")
+        with patch("ingestion.pipeline.load_document", side_effect=ValueError("unreadable")):
+            with self.assertRaises(ValueError): ingest_file(file, "lecture_note", subject="DBMS")
+        self.assertEqual(get_original("DBMS", "lecture_note", file.name), original)
 
     def test_question_batches_preserve_source_metadata(self):
         pages = [{"text": "Explain database normalization and redundancy.", "year": 2023, "filename": "db_2023.pdf", "page": 2},

@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from agents.analysis import analyze_subject, get_analysis
 from agents.diagnostics import model_status, recent_calls, latest_trace
@@ -24,6 +25,7 @@ from backend.jobs import JobManager
 from backend.practice import save_quiz, answer_question, progress, latest_quiz
 from ingestion.pipeline import ingest_file, SOURCE_TYPES, extract_year
 from ingestion.document_loader import DOCUMENT_EXTENSIONS
+from ingestion.original_store import get_original
 from ingestion.source_store import list_subjects, create_subject, list_files, get_pages, delete_source_pages
 from ingestion.source_store import get_source_pages, page_numbers, set_source_year
 from embeddings.embed_store import delete_source_vectors, get_collection, embedding_identity, EMBED_PROVIDER
@@ -53,7 +55,9 @@ async def lifespan(app):
 app = FastAPI(title="Easy to Study", version="0.2.0", lifespan=lifespan,
               dependencies=[Depends(access)])
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
-                   allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Content-Type", "Authorization"])
+                   allow_methods=["GET", "HEAD", "POST", "PATCH", "DELETE"],
+                   allow_headers=["Content-Type", "Authorization", "Range", "If-Range"],
+                   expose_headers=["Accept-Ranges", "Content-Length", "Content-Range", "ETag"])
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
@@ -151,6 +155,30 @@ def delete_file(subject: str, filename: str, source_type: str):
     delete_source_vectors(subject, source_type, filename)
     delete_source_pages(subject, source_type, filename)
     return {"removed": filename}
+
+
+@app.get("/api/original-info")
+def original_info(subject: str, filename: str, source_type: str):
+    subject_exists(subject)
+    if not get_source_pages(subject, source_type, filename, 0):
+        raise HTTPException(404, "Material not found")
+    original = get_original(subject, source_type, filename)
+    return {"available": bool(original), "size": original["size"] if original else None,
+            "version": original["digest"] if original else None}
+
+
+@app.api_route("/api/original", methods=["GET", "HEAD"])
+def original_file(subject: str, filename: str, source_type: str):
+    subject_exists(subject)
+    if not get_source_pages(subject, source_type, filename, 0):
+        raise HTTPException(404, "Material not found")
+    original = get_original(subject, source_type, filename)
+    if not original:
+        raise HTTPException(404, "Original PDF unavailable. Upload this PDF again to enable page preview.")
+    return FileResponse(original["path"], media_type="application/pdf", filename=filename,
+                        content_disposition_type="inline",
+                        headers={"Cache-Control": "private, no-cache", "Content-Encoding": "identity",
+                                 "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/api/analysis")

@@ -25,7 +25,6 @@ import {
   type Config,
   type Job,
   type Material,
-  type Page,
   type Progress,
   type Quiz,
   type Subject,
@@ -39,15 +38,18 @@ import { Practice } from './components/Practice'
 import { ProgressView } from './components/Progress'
 import { Settings, TokenInput } from './components/Settings'
 import { TopicList } from './components/Topics'
-import { active, errorText, kinds, stamp } from './utils'
+import { Subjects } from './components/Subjects'
+import { SourceReader } from './components/SourceReader'
+import { active, errorText, stamp } from './utils'
 
-type View = 'overview' | 'materials' | 'practice' | 'progress' | 'settings'
+type View =
+  'subjects' | 'overview' | 'materials' | 'practice' | 'progress' | 'settings'
 function App() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [subject, setSubject] = useState(
     localStorage.getItem('selected-subject') || '',
   )
-  const [view, setView] = useState<View>('overview')
+  const [view, setView] = useState<View>('subjects')
   const [config, setConfig] = useState<Config | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
@@ -67,9 +69,7 @@ function App() {
   const [modal, setModal] = useState<'subject' | 'upload' | null>(null)
   const [topic, setTopic] = useState<Topic | null>(null)
   const [source, setSource] = useState<Material | null>(null)
-  const [pages, setPages] = useState<Page[]>([])
-  const [pageNumbers, setPageNumbers] = useState<number[]>([])
-  const [loadingPages, setLoadingPages] = useState(false)
+  const [sourcePage, setSourcePage] = useState<number | undefined>()
   const [deleting, setDeleting] = useState<Material | null>(null)
   const [editingYear, setEditingYear] = useState<Material | null>(null)
   const [quiz, setQuiz] = useState<Quiz | null>(null)
@@ -271,27 +271,9 @@ function App() {
     setMobileNav(false)
   }
 
-  const openSource = async (material: Material, page?: number) => {
+  const openSource = (material: Material, page?: number) => {
     setSource(material)
-    setLoadingPages(true)
-    setPages([])
-    try {
-      const params = {
-        subject,
-        filename: material.filename,
-        source_type: material.source_type,
-      }
-      const [text, numbers] = await Promise.all([
-        api<Page[]>(`/pages?${query({ ...params, page: page || 0 })}`),
-        api<number[]>(`/page-numbers?${query(params)}`),
-      ])
-      setPages(text)
-      setPageNumbers(numbers)
-    } catch (error) {
-      notify(error)
-    } finally {
-      setLoadingPages(false)
-    }
+    setSourcePage(page)
   }
   const openCitation = (filename: string, page?: number) => {
     const material = materials.find((m) => m.filename === filename)
@@ -331,7 +313,7 @@ function App() {
           href="#"
           onClick={(e) => {
             e.preventDefault()
-            changeView('overview')
+            changeView('subjects')
           }}
         >
           <span className="brand-mark">
@@ -345,8 +327,9 @@ function App() {
         <div className="sidebar-label">YOUR WORKSPACE</div>
         <nav className="workspace-nav" aria-label="Workspace">
           <button
-            className={view !== 'settings' ? 'nav-item selected' : 'nav-item'}
-            onClick={() => changeView('overview')}
+            className={view === 'subjects' ? 'nav-item selected' : 'nav-item'}
+            aria-current={view === 'subjects' ? 'page' : undefined}
+            onClick={() => changeView('subjects')}
           >
             <Layers3 size={18} />
             My subjects<span className="nav-count">{subjects.length}</span>
@@ -371,7 +354,7 @@ function App() {
           {subjects.map((s) => (
             <button
               key={s.name}
-              className={`subject-link ${s.name === subject && view !== 'settings' ? 'subject-selected' : ''}`}
+              className={`subject-link ${s.name === subject && view !== 'settings' && view !== 'subjects' ? 'subject-selected' : ''}`}
               onClick={() => {
                 setSubject(s.name)
                 changeView('overview')
@@ -432,12 +415,14 @@ function App() {
             <Menu size={20} />
           </button>
           <div className="breadcrumb">
-            <span>My subjects</span>
+            <button onClick={() => changeView('subjects')}>My subjects</button>
             <ChevronRight size={13} />
             <strong>
               {view === 'settings'
                 ? 'Settings & activity'
-                : subject || 'Get started'}
+                : view === 'subjects'
+                  ? 'All courses'
+                  : subject || 'Get started'}
             </strong>
           </div>
           <span className="topbar-label">YOUR STUDY SPACE</span>
@@ -483,6 +468,16 @@ function App() {
             </div>
           ) : view === 'settings' ? (
             <Settings jobs={jobs} config={config} notify={notify} />
+          ) : view === 'subjects' ? (
+            <Subjects
+              subjects={subjects}
+              canCreate={!!config?.uploads_enabled}
+              open={(name) => {
+                setSubject(name)
+                changeView('overview')
+              }}
+              create={() => setModal('subject')}
+            />
           ) : !subject ? (
             <div className="onboarding">
               <span className="eyebrow">A FRESH START</span>
@@ -911,46 +906,12 @@ function App() {
       )}
       {source && (
         <Modal title={source.filename} wide close={() => setSource(null)}>
-          <div className="source-reader">
-            <p className="muted">
-              {kinds[source.source_type]}
-              {source.year ? ` · ${source.year}` : ''} · Check extraction before
-              trusting generated questions.
-            </p>
-            {pageNumbers.length > 0 && (
-              <label className="field-label">
-                Page / slide / segment
-                <select
-                  className="text-input mt-2"
-                  value={pages[0]?.page || pageNumbers[0]}
-                  onChange={(e) =>
-                    void openSource(source, Number(e.target.value))
-                  }
-                >
-                  {pageNumbers.map((number) => (
-                    <option key={number} value={number}>
-                      {number}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {loadingPages ? (
-              <div className="loading-state">
-                <Loader2 size={20} className="animate-spin" />
-                Reading saved text…
-              </div>
-            ) : (
-              pages.map((page) => (
-                <section key={page.page}>
-                  <span className="eyebrow">
-                    PAGE / SLIDE / SEGMENT {page.page}
-                  </span>
-                  <pre>{page.text}</pre>
-                </section>
-              ))
-            )}
-          </div>
+          <SourceReader
+            key={`${subject}:${source.source_type}:${source.filename}:${sourcePage || 0}`}
+            subject={subject}
+            material={source}
+            initialPage={sourcePage}
+          />
         </Modal>
       )}
       {deleting && (
