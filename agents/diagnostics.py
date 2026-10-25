@@ -6,21 +6,29 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from agents.llm import LOG_PATH, TRACE_PATH
+from agents.llm import provider_settings
+from embeddings.embed_store import EMBED_PROVIDER, embedding_identity
 
 
 def model_status() -> dict:
-    mode = os.getenv("MODE", "local").lower()
-    if mode != "local":
-        return {"provider": mode, "model": os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")}
+    provider, model = provider_settings()
+    if provider == "groq":
+        return {"provider": "Groq", "model": model, "key_configured": bool(os.getenv("GROQ_API_KEY")),
+                "embed_model": embedding_identity(), "embed_provider": EMBED_PROVIDER}
     host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
     result = {"provider": "Ollama", "host": host,
-              "chat_model": os.getenv("OLLAMA_LLM_MODEL", "qwen2.5:7b"),
-              "embed_model": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")}
+              "chat_model": model,
+              "embed_model": embedding_identity(), "embed_provider": EMBED_PROVIDER}
     try:
         with urlopen(host + "/api/tags", timeout=3) as response:
             payload = json.load(response)
         result["reachable"] = True
         result["installed_models"] = [m.get("name") for m in payload.get("models", [])]
+        try:
+            with urlopen(host + "/api/ps", timeout=3) as response:
+                result["loaded_models"] = json.load(response).get("models", [])
+        except Exception:
+            result["loaded_models"] = []
     except Exception as exc:
         result["reachable"] = False
         result["error"] = f"{type(exc).__name__}: {exc}"

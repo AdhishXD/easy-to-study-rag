@@ -1,58 +1,115 @@
-# Exam Prep Synthesizer
+# Easy to Study
 
-Index a course's lecture notes, slides, textbooks, recordings, and past papers. The app keeps full extracted pages for LLM topic and question analysis, and overlapping chunks for retrieval-grounded quizzes. It supports MCQs and 2, 3, and 5 mark answers.
+A course workspace that connects lecture notes, textbooks, recordings, and past exam papers. Find recurring exam topics, read their teaching context, and practice with MCQs or 2, 3, and 5 mark questions.
 
-## Local setup
+Built with **React + TypeScript + Tailwind**, **FastAPI**, local **Chroma**, and **SQLite**. Generation uses Ollama locally or a free Groq account. No paid service is required to run it.
 
-Use Python 3.12 in a fresh virtual environment. Install `requirements-local.txt`, copy `.env.example` to `.env`, and pull the Ollama models:
+## Run locally
+
+Use Python 3.12 and Node.js 24. Create a fresh environment on a new machine:
 
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements-local.txt
-ollama pull qwen2.5:7b
-ollama pull nomic-embed-text
-streamlit run app.py
+python -m pip install -r requirements-local.txt
+# Copy only if you do not already have .env:
+Copy-Item .env.example .env
+# Add GROQ_API_KEY to .env for Groq, or install Ollama for local generation.
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Choose a subject/course name when indexing. The Add material tab accepts lecture notes and textbooks as PDF, PPTX (speaker notes included), legacy PPT, DOCX, TXT, or MD, plus common video/audio formats. Legacy PPT conversion needs LibreOffice installed locally. Past papers currently accept PDF and need a four-digit year in the filename, a `-ese-25`/`-makeup-25` suffix, or an explicit fallback year in the UI. Scanned PDFs need OCR before ingestion. Local video transcription uses faster-whisper on CPU.
+In a second terminal:
 
-After indexing, inspect the extracted page text in the Study tab, then click **Analyze teaching material and past papers**. Re-index files that were uploaded before full-page storage was added. Analysis can take several minutes with a local model.
-
-The Diagnostics tab checks whether Ollama responds and whether the configured chat and embedding models are installed. On Windows, Ollama's own server events are in `%LOCALAPPDATA%\Ollama\server.log`. Application call timing and errors are in `db/llm_calls.log`. Set `LOG_LLM_CONTENT=1` in `.env` to save local prompts and responses in the ignored `db/llm_trace.jsonl`; it contains your study text. Hidden model reasoning is not exposed by these logs.
-
-The repo's old `venv/` was created against a Python install that is no longer present; create a fresh environment. Stored vectors live in `db/chroma_store/` and are ignored by Git.
-
-## Free public demo
-
-The current hosted target is [Streamlit Community Cloud](https://streamlit.io/cloud), using a fixed **synthetic DBMS dataset**. In the Cloud deployment settings, choose Python 3.12, set the entry point to `app.py`, and add root-level secrets:
-
-```toml
-MODE = "demo"
-GROQ_API_KEY = "your-free-tier-Groq-key"
-GROQ_MODEL = "openai/gpt-oss-20b"
+```powershell
+cd frontend
+npm ci
+npm run dev
 ```
 
-The demo uses a small CPU sentence-transformer embedding model and Groq for generation. Its sample Chroma index is recreated when the app starts; the local mode uses Ollama for both embeddings and generation. Public uploads are disabled so visitors cannot mix private course material into a shared ephemeral index. To replace the synthetic material, update `demo_seed.py` with material you have permission to publish.
+Open **http://127.0.0.1:5173**. API documentation is at **http://127.0.0.1:8000/docs**. Vite forwards `/api` requests to FastAPI. On Linux/macOS, activate the environment with `source .venv/bin/activate`.
 
-## Design notes and limits
+For a single service, run `npm run build` in `frontend/`, then start FastAPI. It serves the production frontend at **http://127.0.0.1:8000**. Build before starting the backend. Use one Uvicorn worker: the background queue belongs to one process.
 
-- Chunks preserve source type, filename, page/slide/segment, subject, and exam year where applicable. Chunking uses overlapping, boundary-aware windows and deterministic IDs. Full extracted pages live in `db/source_pages.sqlite3`.
-- The LLM extracts topics from every teaching page, extracts complete questions from past-paper pages, maps questions to taught topics, and groups possible repeats across years. Years and source locations come from ingestion metadata, not model claims. These groups are candidates, not verified duplicates.
-- The app rejects malformed JSON and weakly source-matched extracted text. Bad PDF extraction still requires OCR or manual source cleanup; inspect the saved text before trusting analysis.
-- The model only sees retrieved teaching passages. The app validates its JSON and attaches source labels from retrieval. Citation labels show which passages were supplied; they do not independently prove every sentence of a generated answer.
-- Quiz quality on real course material still needs evaluation. Image-only pages, handwritten notes, and tables can parse poorly without additional extraction/OCR.
-- CrewAI orchestration and SQLite performance tracking are planned. The present app calls the ingestion, analysis, and quiz modules directly.
+## Choose inference
 
-## Main modules
+`LLM_PROVIDER=auto` uses Groq if `GROQ_API_KEY` is configured; otherwise it uses Ollama. Set `LLM_PROVIDER=ollama` to keep generation local. Restart the backend after changing `.env`.
 
-- `ingestion/pipeline.py`: file routing and ingestion
-- `embeddings/embed_store.py`: local/demo embeddings and Chroma queries
-- `agents/analysis.py`: full-page topic and question analysis
-- `agents/diagnostics.py`: model status and call trace
-- `agents/quiz_agent.py`: grounded question generation and validation
-- `app.py`: Streamlit interface
+To use free Groq inference, add these to the ignored `.env` file:
 
-The `test_day2.py` through `test_day5.py` scripts are optional subject-aware checkpoints.
+```dotenv
+LLM_PROVIDER=auto
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=openai/gpt-oss-20b
+```
 
-Local study files belong in the ignored sample_data/ folder, with lecture_videos/ and past_qps/ subfolders as needed.
+The key stays on the backend. Retrieved teaching text and analysis passages are sent to Groq when that provider is selected. Free quotas still apply. Rate limits are retried with a bounded wait; the UI reports failures instead of inventing results.
+
+Uploads and search use **FastEmbed on the CPU** by default (`BAAI/bge-small-en-v1.5`, 384 dimensions). The first upload downloads approximately 67 MB to the ignored `db/model_cache/`; subsequent uploads reuse it. Ollama is not required for embeddings. Existing saved pages are automatically indexed with the new embedding model when practice first needs them; the old index remains separate. To use Ollama embeddings instead, set `EMBED_PROVIDER=ollama` and pull `nomic-embed-text`.
+
+For local generation, run `ollama pull qwen2.5:7b` and start Ollama. For a lighter candidate, pull `qwen3:4b`, set `OLLAMA_LLM_MODEL=qwen3:4b`, and compare question quality on the same course pages. Thinking is disabled by default for models that support that setting. A model name alone does not guarantee faster inference on your hardware.
+
+## Study workflow
+
+1. Open **My subjects** to see and search your courses. Create one subject per course.
+2. Add notes, textbooks, recordings, and dated past papers. Documents support PDF, PPTX with speaker notes, PPT, DOCX, TXT, and MD. Recordings support MP4, MP3, WAV, M4A, and WEBM.
+3. Open a source in **Materials** or from a citation. PDFs open at the referenced original page with zoom and page navigation; switch to **Extracted text** to inspect what the model can read. Legacy PPT needs LibreOffice; scanned or handwritten PDFs need OCR. Formats without a loader are rejected clearly.
+4. Check exam years. Years in filenames take priority over the fallback year. Existing paper years can be corrected in the library.
+5. Analyze the course. Teaching material alone is enough for a topic map and practice; dated past papers add recurrence evidence. Jobs run in the background, show progress, and can be cancelled between processing steps. A current model request or file commit may finish before cancellation takes effect.
+6. Explore topics, complete past-paper questions, and candidate repeats with original source text.
+7. Generate a practice set. MCQs are checked on the backend; written answers use self-assessment. The latest set and submitted answers are restored per subject, and drafts survive navigation and refresh in the current browser session. Progress shows topics that need another look.
+
+The materials library can remove incorrectly assigned files. Removal clears that course's saved analysis. Subjects isolate course material; this is a local workspace, not a multi-user account system.
+
+Original PDFs are retained in the ignored `db/originals/` directory (`ORIGINALS_PATH`). Identical PDF bytes share one stored file, including across subjects. Removing or replacing a source removes its old PDF only after the last reference is gone. Older uploads without an original retain the text reader; upload the same PDF again to restore preview. Presentations and recordings continue to use extracted text.
+
+The PDF.js viewer loads on demand, renders only the selected page, and releases the document on close. Authenticated byte-range responses allow partial downloads; fonts and decoders are served locally. No page screenshots are stored, and opening a PDF makes no model calls. `npm run dev` and `npm run build` prepare the PDF viewer assets automatically.
+
+## Performance and grounding
+
+- Stable batches cover all extracted teaching pages and past-paper text. Text is not silently sampled.
+- Analysis responses are cached by provider, model, prompt, and generation settings. Completed analysis also records a corpus fingerprint and algorithm version.
+- File fingerprints skip unchanged parsing, transcription, and indexing. They include processing settings so changing the index or transcription settings triggers new work.
+- Embeddings use batched requests and a persistent text/model cache. All vectors for a source are prepared before replacing its stored passages; obsolete chunks are removed after replacement.
+- One bounded worker prevents concurrent local model jobs from competing for memory. HTTP requests and navigation remain responsive.
+- Quiz retrieval expands matched chunks with surrounding page context. Sources come from stored retrieval metadata. JSON and source references are validated; invalid output is skipped.
+- Recurrence counts distinct years. It is evidence for prioritizing study, not a prediction of the next exam. Candidate repeats and generated answers still need human review.
+
+See [the performance audit](docs/performance.md) for measured work sizes, fixes, and remaining limits, and [the UI design notes](docs/design.md) for interface decisions.
+
+## Diagnostics and checks
+
+**Settings & activity** shows jobs, elapsed time, cache hits, model status, and request timing. Ollama status includes loaded model sizes and VRAM usage when available. App logs are in `db/llm_calls.log`. Set `LOG_LLM_CONTENT=1` to save local prompts/responses in `db/llm_trace.jsonl`; these contain course text and are ignored by Git.
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests -v
+python scripts/audit_performance.py --output db/performance-audit.json
+cd frontend
+npm run build
+npm run format:check
+```
+
+Tests use isolated temporary stores and mocked inference. They do not send course data to a model provider. The audit inspects saved course sizes and times read endpoints without running inference.
+
+## Hosting, next
+
+The frontend builds to static assets and FastAPI can serve them from the same origin. Deployment has not been performed yet. A free demo should use a curated, publishable dataset and `MODE=demo`; install `requirements-demo.txt` for its small CPU embedding model. Public uploads and file changes are disabled in demo mode.
+
+Before exposing a private workspace, set `APP_ACCESS_TOKEN` and restrict `CORS_ORIGINS`. The frontend accepts that token for the current browser session. Free hosting often has sleep, memory, and ephemeral-disk limits; persistent private uploads need storage and user isolation beyond this local version.
+
+## Project layout
+
+```text
+frontend/          React components, Tailwind styles, typed API client
+backend/           FastAPI routes, background jobs, practice history
+agents/            Course analysis, grounded quizzes, inference adapter/cache
+ingestion/         Loaders, chunking, fingerprints, full-page source storage
+embeddings/        Batched embeddings and Chroma indexing/retrieval
+tests/             Isolated backend and grounding regressions
+scripts/           Performance audit
+docs/              Design decisions and performance findings
+db/                Private indexes, SQLite files, cache, and logs (ignored)
+sample_data/       Private study files, lecture_videos/, past_qps/ (ignored)
+```
+
+The original Streamlit implementation and checkpoint scripts are preserved on GitHub at `f3c98e1`. They have been removed from the current codebase; the supported interface is the React application and automated checks live in `tests/`.

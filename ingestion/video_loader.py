@@ -20,6 +20,7 @@ import os
 from typing import List, Tuple
 
 from faster_whisper import WhisperModel
+from agents.runtime import report, check_cancelled
 
 DEFAULT_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 
@@ -48,12 +49,15 @@ def transcribe_video(
         in the same shape as pdf_loader/pptx_loader output.
     """
     model = _get_model(model_size)
-    segments, info = model.transcribe(file_path, beam_size=5)
+    segments, info = model.transcribe(file_path, beam_size=int(os.getenv("WHISPER_BEAM_SIZE", "1")),
+                                      vad_filter=True)
 
     print(f"  Detected language: {info.language} (confidence={info.language_probability:.2f})")
 
     output = []
     for i, segment in enumerate(segments, start=1):
+        check_cancelled()
+        report(f"Transcribing lecture: {int(segment.end // 60)} min processed", min(0.19, 0.1 + 0.09 * segment.end / max(info.duration, 1)))
         text = segment.text.strip()
         if text:
             output.append((i, text))
