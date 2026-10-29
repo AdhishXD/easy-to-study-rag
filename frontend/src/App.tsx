@@ -324,7 +324,7 @@ function App() {
             <span className="brand-caption">Make room for understanding.</span>
           </span>
         </a>
-        <div className="sidebar-label">YOUR WORKSPACE</div>
+        <div className="sidebar-label">Workspace</div>
         <nav className="workspace-nav" aria-label="Workspace">
           <button
             className={view === 'subjects' ? 'nav-item selected' : 'nav-item'}
@@ -336,7 +336,7 @@ function App() {
           </button>
         </nav>
         <div className="sidebar-label flex items-center justify-between">
-          SUBJECTS
+          Subjects
           {config?.uploads_enabled && (
             <button
               className="small-icon"
@@ -425,7 +425,7 @@ function App() {
                   : subject || 'Get started'}
             </strong>
           </div>
-          <span className="topbar-label">YOUR STUDY SPACE</span>
+          <span className="topbar-label">Private study workspace</span>
         </header>
         <main id="main-content" className="main-content">
           {notice && (
@@ -480,7 +480,7 @@ function App() {
             />
           ) : !subject ? (
             <div className="onboarding">
-              <span className="eyebrow">A FRESH START</span>
+              <span className="eyebrow">Start here</span>
               <h1>
                 Your next exam.
                 <br />A clearer plan.
@@ -516,7 +516,7 @@ function App() {
             <>
               <section className="course-heading">
                 <div>
-                  <span className="eyebrow">YOUR COURSE, IN FOCUS</span>
+                  <span className="eyebrow">Course overview</span>
                   <h1>{subject}</h1>
                   <p>
                     {current?.files || 0} materials <span>·</span>{' '}
@@ -612,7 +612,7 @@ function App() {
                     <section className="focus-panel">
                       <span className="eyebrow">
                         <Sparkles size={14} />
-                        STUDY WITH DIRECTION
+                        Your study plan
                       </span>
                       <h2>
                         {analysis
@@ -648,7 +648,7 @@ function App() {
                       )}
                     </section>
                     <section className="coverage-panel">
-                      <span className="eyebrow">THE BIG PICTURE</span>
+                      <span className="eyebrow">At a glance</span>
                       <div className="coverage-number">
                         {analysis ? recurring.length : paperYears.length}
                         <span>
@@ -681,7 +681,7 @@ function App() {
                   </div>
                   <div className="section-heading">
                     <div>
-                      <span className="eyebrow">WHAT TO STUDY</span>
+                      <span className="eyebrow">What to study</span>
                       <h2>
                         {analysis ? 'Your topic map' : 'Build your foundation'}
                       </h2>
@@ -818,7 +818,7 @@ function App() {
       {topic && (
         <Modal title={topic.name} wide close={() => setTopic(null)}>
           <div className="topic-detail">
-            <span className="eyebrow">TEACHING CONTEXT</span>
+            <span className="eyebrow">From your materials</span>
             <p className="topic-summary">{topic.summary}</p>
             <div className="flex flex-wrap gap-2 mb-7">
               {topic.years.map((year) => (
@@ -830,16 +830,17 @@ function App() {
                 {topic.num_years} distinct exam years
               </span>
             </div>
-            <h3>Teaching sources supplied</h3>
+            <h3>Sources</h3>
             <div className="source-links">
-              {topic.sources.map((s, i) => (
+              {topic.sources.map((s) => (
                 <button
-                  key={i}
+                  key={`${s.filename}:${s.page}`}
                   onClick={() => openCitation(s.filename, s.page)}
+                  aria-label={`Open ${s.filename}, page ${s.page}`}
                 >
                   <FileText size={15} />
                   <span>
-                    {s.filename} · page {s.page}
+                    {s.filename} · Page {s.page}
                   </span>
                   <ChevronRight size={14} />
                 </button>
@@ -854,7 +855,7 @@ function App() {
                     className="source-caption"
                     onClick={() => openCitation(q.filename, q.page)}
                   >
-                    {q.year} · {q.filename} · page {q.page}
+                    {q.year} · {q.filename} · Page {q.page}
                     <ArrowRight size={12} />
                   </button>
                   <p>{q.question}</p>
@@ -865,7 +866,7 @@ function App() {
                 No past-paper questions have been matched to this topic.
               </p>
             )}
-            <h3>Possible recurring questions</h3>
+            <h3>Recurring exam questions</h3>
             {analysis?.recurring_groups
               .filter((g) => g.topic === topic.name)
               .map((group, i) => (

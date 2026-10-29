@@ -13,6 +13,13 @@ import { useEffect, useState } from 'react'
 import { post, type Analysis, type Quiz } from '../api'
 import { Empty } from './Common'
 
+function citationDetails(label: string) {
+  const match = label.match(/^(.*) \(page\/slide\/segment (\d+)\)$/)
+  return match
+    ? { filename: match[1], page: Number(match[2]) }
+    : { filename: label, page: undefined }
+}
+
 type PracticeState = {
   index: number
   answers: Record<number, string>
@@ -300,21 +307,22 @@ export function Practice({
               <p>{question.correct_answer}</p>
               <p className="muted">{question.explanation}</p>
               <div className="source-links">
-                {question.sources.map((label) => (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      const match = label.match(
-                        /^(.*) \(page\/slide\/segment (\d+)\)$/,
-                      )
-                      if (match) citation(match[1], Number(match[2]))
-                    }}
-                  >
-                    <FileText size={14} />
-                    {label}
-                    <ChevronRight size={13} />
-                  </button>
-                ))}
+                {question.sources.map((label) => {
+                  const source = citationDetails(label)
+                  return (
+                    <button
+                      key={`${source.filename}:${source.page ?? 'source'}`}
+                      onClick={() => citation(source.filename, source.page)}
+                    >
+                      <FileText size={14} />
+                      <span>
+                        {source.filename}
+                        {source.page ? ` · Page ${source.page}` : ''}
+                      </span>
+                      <ChevronRight size={13} />
+                    </button>
+                  )
+                })}
               </div>
               {!question.options.length && !results[index] && (
                 <div className="flex gap-3 mt-5">

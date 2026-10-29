@@ -42,7 +42,7 @@ export function Library({
     <section>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">EVERYTHING IN ONE PLACE</span>
+          <span className="eyebrow">Course materials</span>
           <h2>Your course library</h2>
         </div>
         <span className="subtle-label">{materials.length} materials</span>

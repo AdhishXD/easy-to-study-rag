@@ -39,11 +39,8 @@ export function TopicList({
           Recurring only
         </label>
       </div>
-      {filtered.slice(0, limit).map((t, index) => (
+      {filtered.slice(0, limit).map((t) => (
         <button key={t.name} className="topic-row" onClick={() => onSelect(t)}>
-          <span className="topic-index">
-            {String(index + 1).padStart(2, '0')}
-          </span>
           <span className="topic-copy">
             <strong>{t.name}</strong>
             <span>{t.summary}</span>
@@ -52,7 +49,8 @@ export function TopicList({
             {t.num_years ? (
               <>
                 <span className="recurrence-label">
-                  {t.num_years} exam {t.num_years === 1 ? 'year' : 'years'}
+                  Seen in {t.num_years} exam{' '}
+                  {t.num_years === 1 ? 'year' : 'years'}
                 </span>
                 <small>{t.years.join(' · ')}</small>
               </>

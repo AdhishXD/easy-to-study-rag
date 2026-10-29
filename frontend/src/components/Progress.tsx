@@ -15,7 +15,7 @@ export function ProgressView({
     <section>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">SMALL STEPS ADD UP</span>
+          <span className="eyebrow">Your progress</span>
           <h2>See your understanding grow.</h2>
         </div>
       </div>

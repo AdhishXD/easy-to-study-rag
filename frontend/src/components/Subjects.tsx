@@ -22,9 +22,9 @@ export function Subjects({
     <section>
       <div className="course-heading">
         <div>
-          <span className="eyebrow">YOUR WORKSPACE</span>
+          <span className="eyebrow">Your study space</span>
           <h1>My subjects</h1>
-          <p>A place for every course. Pick up where you left off.</p>
+          <p>Pick up where you left off, or make room for a new course.</p>
         </div>
         {canCreate && (
           <button className="button primary" onClick={create}>
@@ -78,7 +78,7 @@ export function Subjects({
                       : 'Ready for your course material'}
                 </span>
                 <span>
-                  Open subject <ArrowUpRight size={13} />
+                  Continue <ArrowUpRight size={13} />
                 </span>
               </div>
             </button>
