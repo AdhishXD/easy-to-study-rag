@@ -40,6 +40,17 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(len(questions), 1)
         self.assertIn("normalization", questions[0]["question"])
 
+    @patch("agents.analysis._json_array", return_value=[
+        {"source": 0, "question": "Explain normalization and why it reduces redundancy.", "marks": 5},
+        {"source": 0, "question": "Describe functional dependencies with examples.", "marks": "10"},
+    ])
+    def test_marks_are_kept_only_when_explicit_integer_values(self, _):
+        pages = [{"text": "Explain normalization and why it reduces redundancy. 5 marks. "
+                          "Describe functional dependencies with examples. 10 marks.",
+                  "year": 2024, "filename": "paper.pdf", "page": 1}]
+        questions = _extract_paper_questions(pages)
+        self.assertEqual([question["marks"] for question in questions], [5, None])
+
     def test_overlap_has_no_duplicate_tail_and_ids_are_stable(self):
         arguments = ([(1, "Functional dependency. " * 100)], "lecture_note", "note.pdf")
         first = chunk_pages(*arguments, extra_metadata={"subject": "DBMS"})

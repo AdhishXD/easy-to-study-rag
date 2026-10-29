@@ -53,6 +53,12 @@ export function TopicList({
                   {t.num_years === 1 ? 'year' : 'years'}
                 </span>
                 <small>{t.years.join(' · ')}</small>
+                {t.weightage_percent != null && (
+                  <small>
+                    {t.total_marks || 0} marks · {t.weightage_percent}% of known
+                    marks
+                  </small>
+                )}
               </>
             ) : (
               <small>Teaching topic</small>

@@ -13,7 +13,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from backend.main import app
 from ingestion import source_store
-from agents.analysis import analyze_subject, save_analysis, _extract_paper_questions, _find_repeats, _merge_topics
+from agents.analysis import analyze_subject, save_analysis, _extract_paper_questions, _find_repeats, _merge_topics, _add_topic_evidence
 from agents.llm import chat
 from backend.practice import save_quiz, answer_question, progress, latest_quiz
 
@@ -161,6 +161,23 @@ class IsolatedTests(unittest.TestCase):
         with patch("agents.analysis._json_array", return_value=[]):
             self.assertEqual(_merge_topics(topics), topics)
 
+    def test_topic_evidence_uses_only_explicit_marks(self):
+        topics = [
+            {"name": "RDF"},
+            {"name": "Ontologies"},
+        ]
+        questions = [
+            {"topic": "RDF", "year": 2023, "marks": 5},
+            {"topic": "RDF", "year": 2024, "marks": None},
+            {"topic": "Ontologies", "year": 2024, "marks": 10},
+        ]
+        evidence = _add_topic_evidence(questions, topics)
+        self.assertEqual(evidence, {"known_marks": 15, "marked_questions": 2, "total_questions": 3})
+        self.assertEqual(topics[0]["years"], [2023, 2024])
+        self.assertEqual(topics[0]["question_count"], 2)
+        self.assertEqual(topics[0]["total_marks"], 5)
+        self.assertEqual(topics[0]["weightage_percent"], 33.3)
+
     def test_saved_pages_rebuild_new_index_once(self):
         from ingestion.pipeline import ensure_subject_index
         source_store.replace_pages("DBMS", "lecture_note", "notes.txt", [(1, "Normalization reduces redundancy")])
@@ -296,7 +313,7 @@ class IsolatedTests(unittest.TestCase):
         teaching = source_store.get_pages("DBMS", ("textbook", "lecture_note", "lecture_slide", "lecture_video"))
         papers = source_store.get_pages("DBMS", ("past_qp",))
         saved = {"subject": "DBMS", "fingerprint": source_store.corpus_fingerprint(teaching + papers),
-                 "provider": "ollama", "model": "qwen2.5:7b", "analysis_version": 3, "topics": []}
+                 "provider": "ollama", "model": "qwen2.5:7b", "analysis_version": 4, "topics": []}
         save_analysis(saved)
         with patch("agents.analysis._extract_teaching_topics") as extraction:
             self.assertEqual(analyze_subject("DBMS"), saved)

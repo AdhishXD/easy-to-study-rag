@@ -19,6 +19,9 @@ export type Topic = {
   sources: Source[]
   years: number[]
   num_years: number
+  question_count?: number
+  total_marks?: number
+  weightage_percent?: number | null
 }
 export type PaperQuestion = {
   id: string
@@ -26,6 +29,7 @@ export type PaperQuestion = {
   year: number
   filename: string
   page: number
+  marks?: number | null
   topic?: string
 }
 export type Analysis = {
@@ -39,6 +43,11 @@ export type Analysis = {
     reason: string
     questions: PaperQuestion[]
   }[]
+  exam_evidence?: {
+    known_marks: number
+    marked_questions: number
+    total_questions: number
+  }
 }
 export type QuizQuestion = {
   question: string

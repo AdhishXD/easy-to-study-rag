@@ -60,6 +60,8 @@ For local generation, run `ollama pull qwen2.5:7b` and start Ollama. For a light
 
 The materials library can remove incorrectly assigned files. Removal clears that course's saved analysis. Subjects isolate course material; this is a local workspace, not a multi-user account system.
 
+Past-paper analysis keeps a question's mark value only when it is explicitly visible in the extracted paper text. Topic weightage is reported as a share of those known marks, alongside how many extracted questions had readable marks. Missing marks are never guessed or treated as zero. Recurrence counts distinct exam years and repeated-question groups link back to the original paper pages.
+
 Original PDFs are retained in the ignored `db/originals/` directory (`ORIGINALS_PATH`). Identical PDF bytes share one stored file, including across subjects. Removing or replacing a source removes its old PDF only after the last reference is gone. Older uploads without an original retain the text reader; upload the same PDF again to restore preview. Presentations and recordings continue to use extracted text.
 
 The PDF.js viewer loads on demand, renders only the selected page, and releases the document on close. Authenticated byte-range responses allow partial downloads; fonts and decoders are served locally. No page screenshots are stored, and opening a PDF makes no model calls. `npm run dev` and `npm run build` prepare the PDF viewer assets automatically.

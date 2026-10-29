@@ -12,7 +12,6 @@ import {
   Menu,
   Plus,
   Settings2,
-  Sparkles,
   X,
 } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -33,6 +32,7 @@ import {
 
 import { Empty, Modal } from './components/Common'
 import { EditYear, NewSubject, Upload } from './components/Forms'
+import { ExamEvidence } from './components/ExamEvidence'
 import { Library } from './components/Library'
 import { Practice } from './components/Practice'
 import { ProgressView } from './components/Progress'
@@ -611,18 +611,18 @@ function App() {
                   <div className="overview-grid">
                     <section className="focus-panel">
                       <span className="eyebrow">
-                        <Sparkles size={14} />
+                        <BookOpen size={14} />
                         Your study plan
                       </span>
                       <h2>
                         {analysis
-                          ? 'Know where to focus.'
-                          : 'Less scattered. More prepared.'}
+                          ? 'Prepare from exam evidence.'
+                          : 'Build an evidence-based study plan.'}
                       </h2>
                       <p>
                         {analysis
-                          ? 'Explore concepts that have appeared across exam years, with your teaching material beside every question.'
-                          : 'Your past papers tell a story. Connect them to your course material to find the topics worth your attention.'}
+                          ? 'See which topics and questions recur, how many marks they carried, and the original pages behind every result.'
+                          : 'Add teaching material and dated past papers to connect your syllabus with what previous exams actually asked.'}
                       </p>
                       <button
                         className="button primary"
@@ -679,6 +679,13 @@ function App() {
                       </p>
                     </section>
                   </div>
+                  {analysis && (
+                    <ExamEvidence
+                      analysis={analysis}
+                      openTopic={setTopic}
+                      openCitation={openCitation}
+                    />
+                  )}
                   <div className="section-heading">
                     <div>
                       <span className="eyebrow">What to study</span>
@@ -829,6 +836,14 @@ function App() {
               <span className="subtle-label">
                 {topic.num_years} distinct exam years
               </span>
+              {!!topic.total_marks && (
+                <span className="subtle-label">
+                  {topic.total_marks} known marks
+                  {topic.weightage_percent != null
+                    ? ` · ${topic.weightage_percent}% of known marks`
+                    : ''}
+                </span>
+              )}
             </div>
             <h3>Sources</h3>
             <div className="source-links">
@@ -856,6 +871,7 @@ function App() {
                     onClick={() => openCitation(q.filename, q.page)}
                   >
                     {q.year} · {q.filename} · Page {q.page}
+                    {q.marks ? ` · ${q.marks} marks` : ''}
                     <ArrowRight size={12} />
                   </button>
                   <p>{q.question}</p>

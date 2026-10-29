@@ -1733,32 +1733,30 @@ h1 {
   margin-bottom: 3.5rem;
 }
 .focus-panel {
-  color: #fff;
-  background:
-    radial-gradient(circle at 88% 12%, #2d7dd255, transparent 18rem),
-    linear-gradient(145deg, #1d1d1f, #29292d);
-  border: 0;
+  color: var(--label);
+  background: #fff;
+  border: 1px solid #0000000d;
   border-radius: 1.5rem;
   padding: 2.5rem;
-  box-shadow: 0 18px 45px #00000016;
+  box-shadow: 0 1px 2px #00000008;
 }
 .focus-panel .eyebrow,
 .focus-panel > p,
 .focus-panel .panel-footnote {
-  color: #f5f5f7b8;
+  color: var(--label-secondary);
 }
 .focus-panel h2 {
-  color: #fff;
+  color: var(--label);
   font-size: clamp(1.85rem, 3vw, 2.65rem);
   font-weight: 650;
   line-height: 1.08;
 }
 .focus-panel .primary {
-  background: #fff;
-  color: var(--label);
+  background: var(--accent);
+  color: #fff;
 }
 .focus-panel .primary:hover:not(:disabled) {
-  background: #f5f5f7;
+  background: var(--accent-hover);
 }
 .coverage-panel,
 .topic-list,
@@ -1919,6 +1917,150 @@ h1 {
   color: var(--label-secondary);
   font-size: 1.05rem;
 }
+.exam-evidence {
+  margin: 0 0 3.75rem;
+}
+.evidence-heading {
+  margin-bottom: 1.5rem;
+}
+.evidence-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-block: 1px solid #00000012;
+}
+.evidence-column {
+  min-width: 0;
+  padding: 1.75rem 2rem 1.75rem 0;
+}
+.evidence-column + .evidence-column {
+  border-left: 1px solid #00000012;
+  padding: 1.75rem 0 1.75rem 2rem;
+}
+.evidence-column-heading {
+  margin-bottom: 1rem;
+}
+.evidence-column-heading h3 {
+  color: var(--label);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.evidence-column-heading p,
+.evidence-note,
+.evidence-empty {
+  color: var(--label-secondary);
+  font-size: 0.72rem;
+  line-height: 1.65;
+}
+.evidence-column-heading p {
+  margin-top: 0.35rem;
+}
+.priority-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 4.1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid #0000000d;
+  text-align: left;
+}
+.priority-row:hover strong {
+  color: var(--accent);
+}
+.priority-copy,
+.priority-weight {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.priority-copy strong,
+.priority-weight strong {
+  color: var(--label);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.priority-copy span,
+.priority-weight small {
+  color: var(--label-secondary);
+  font-size: 0.65rem;
+}
+.priority-weight {
+  align-items: flex-end;
+  text-align: right;
+}
+.priority-row > svg {
+  color: #a1a1a6;
+}
+.evidence-note {
+  margin-top: 1rem;
+}
+.repeat-item {
+  border-bottom: 1px solid #0000000d;
+}
+.repeat-item summary {
+  min-height: 4.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+.repeat-item summary::-webkit-details-marker {
+  display: none;
+}
+.repeat-item summary > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.repeat-item summary strong {
+  color: var(--label);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.repeat-item summary small,
+.repeat-item summary > span:last-child {
+  color: var(--label-secondary);
+  font-size: 0.65rem;
+}
+.repeat-item > p {
+  color: var(--label-secondary);
+  font-size: 0.72rem;
+  line-height: 1.65;
+  margin-bottom: 0.75rem;
+}
+.repeat-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+}
+.repeat-questions button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+  color: var(--label);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  text-align: left;
+}
+.repeat-questions button:hover {
+  background: #e8f2ff;
+}
+.question-source {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--accent);
+  font-size: 0.64rem;
+  font-weight: 600;
+}
 @media (min-width: 1600px) {
   .main-content {
     padding-top: 4rem;
@@ -2021,6 +2163,23 @@ h1 {
   }
   .overview-grid {
     grid-template-columns: 1fr;
+  }
+  .evidence-grid {
+    grid-template-columns: 1fr;
+  }
+  .evidence-column,
+  .evidence-column + .evidence-column {
+    padding: 1.35rem 0;
+  }
+  .evidence-column + .evidence-column {
+    border-left: 0;
+    border-top: 1px solid #00000012;
+  }
+  .priority-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .priority-row > svg {
+    display: none;
   }
   .coverage-panel {
     padding: 1.5rem;

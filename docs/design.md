@@ -13,5 +13,7 @@ The interface is guided by Apple's official [UI design principles](https://devel
 - Responsive layout: desktop sidebar becomes a mobile drawer; course content remains available without horizontal overflow.
 - Daily use: the most common loop stays shallow—open a subject, see the study plan, continue practice, and open the exact supporting page.
 - Citations: source links use stable filename-and-page identities and human-readable labels; UI indexes and backend citation syntax are never shown.
+- Evidence before interpretation: the overview leads with observed exam years, extracted questions, explicit marks, and original pages. Generated summaries support those facts instead of replacing them.
+- Honest weightage: percentages use only explicitly printed marks and always disclose mark coverage. Unknown marks are neither inferred nor silently counted as zero.
 
 The source reader loads one page at a time and the topic list starts with twenty rows. This reduces rendering work while keeping search and deeper exploration available. Source labels describe supplied evidence; they are not a guarantee that every generated sentence is correct.
