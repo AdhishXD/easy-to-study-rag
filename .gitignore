@@ -6,6 +6,12 @@ __pycache__/
 .eggs/
 build/
 dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 
 # --- Virtual environment ---
 venv/
@@ -19,6 +25,7 @@ env/
 .deps/
 node_modules/
 frontend/dist/
+frontend/.vite/
 frontend/.env.local
 *.sqlite3-wal
 *.sqlite3-shm
