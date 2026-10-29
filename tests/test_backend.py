@@ -13,7 +13,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from backend.main import app
 from ingestion import source_store
-from agents.analysis import analyze_subject, save_analysis, _extract_paper_questions, _find_repeats
+from agents.analysis import analyze_subject, save_analysis, _extract_paper_questions, _find_repeats, _merge_topics
 from agents.llm import chat
 from backend.practice import save_quiz, answer_question, progress, latest_quiz
 
@@ -131,6 +131,35 @@ class IsolatedTests(unittest.TestCase):
         self.assertEqual(restored["quiz_id"], quiz["quiz_id"])
         self.assertEqual(restored["attempts"], [{"question_index": 0, "correct": False, "answer": "A"}])
         self.assertIsNone(latest_quiz("No course"))
+
+    def test_related_subtopics_are_consolidated_with_all_sources(self):
+        topics = [
+            {"name": "RDF Triples", "summary": "RDF represents facts as subject predicate object triples",
+             "sources": [{"filename": "module1.pdf", "page": 2}]},
+            {"name": "RDF Graphs", "summary": "RDF triples form directed labeled graphs",
+             "sources": [{"filename": "module1.pdf", "page": 3}]},
+            {"name": "SPARQL Queries", "summary": "SPARQL retrieves patterns from RDF graphs",
+             "sources": [{"filename": "module2.pdf", "page": 5}]},
+        ]
+        grouped = [{"name": "RDF Data Model", "summary": "RDF represents linked facts as triples and graphs.",
+                    "members": ["RDF Triples", "RDF Graphs"]},
+                   {"name": "SPARQL Queries", "summary": "SPARQL retrieves patterns from RDF graphs.",
+                    "members": ["SPARQL Queries"]}]
+        with patch("agents.analysis._json_array", return_value=grouped):
+            result = _merge_topics(topics)
+        self.assertEqual([topic["name"] for topic in result], ["RDF Data Model", "SPARQL Queries"])
+        self.assertEqual(result[0]["sources"], [
+            {"filename": "module1.pdf", "page": 2},
+            {"filename": "module1.pdf", "page": 3},
+        ])
+
+    def test_topic_consolidation_preserves_unmentioned_concepts(self):
+        topics = [
+            {"name": "Ontologies", "summary": "Ontologies define concepts and relationships", "sources": []},
+            {"name": "Reasoning", "summary": "Reasoners infer facts from ontology axioms", "sources": []},
+        ]
+        with patch("agents.analysis._json_array", return_value=[]):
+            self.assertEqual(_merge_topics(topics), topics)
 
     def test_saved_pages_rebuild_new_index_once(self):
         from ingestion.pipeline import ensure_subject_index
@@ -267,7 +296,7 @@ class IsolatedTests(unittest.TestCase):
         teaching = source_store.get_pages("DBMS", ("textbook", "lecture_note", "lecture_slide", "lecture_video"))
         papers = source_store.get_pages("DBMS", ("past_qp",))
         saved = {"subject": "DBMS", "fingerprint": source_store.corpus_fingerprint(teaching + papers),
-                 "provider": "ollama", "model": "qwen2.5:7b", "analysis_version": 2, "topics": []}
+                 "provider": "ollama", "model": "qwen2.5:7b", "analysis_version": 3, "topics": []}
         save_analysis(saved)
         with patch("agents.analysis._extract_teaching_topics") as extraction:
             self.assertEqual(analyze_subject("DBMS"), saved)

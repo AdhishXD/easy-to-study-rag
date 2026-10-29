@@ -87,28 +87,22 @@ def _extract_teaching_topics(pages: list[dict]) -> list[dict]:
     return list(found.values())
 
 
-def _merge_topics(topics: list[dict]) -> list[dict]:
+def _merge_topic_batch(topics: list[dict]) -> list[dict]:
+    """Turn passage-level concepts into a smaller set of exam-level topics."""
     if len(topics) < 2:
         return topics
-    if len(topics) > 30:
-        # Bound context and generation size instead of silently truncating a large syllabus.
-        output = []
-        for start in range(0, len(topics), 30):
-            output.extend(_merge_topics(topics[start:start + 30]))
-        found = {}
-        for topic in output:
-            key = re.sub(r"\W+", " ", topic["name"].lower()).strip()
-            if key in found:
-                found[key]["sources"].extend(s for s in topic["sources"] if s not in found[key]["sources"])
-            else:
-                found[key] = topic
-        return list(found.values())
     items = _json_array(
-        "Merge names that describe the same taught concept, while keeping distinct "
-        "concepts separate. Only return groups with at least TWO members; omit unique concepts. "
-        "Keep each summary under 200 characters. Return ONLY a JSON array of objects with name, summary, "
-        "and members (an array of exact input names). Do not introduce concepts absent "
-        "from the input.\n\n" + json.dumps(
+        "Consolidate these passage-level concepts into a concise exam syllabus. Group related "
+        "subtopics under the broader concept a student would revise as one unit, even when their "
+        "names are not synonyms. For example, architecture components, roles and operations may "
+        "belong to one architecture topic; definitions, characteristics and examples may belong "
+        "to one core-concept topic. Do not combine concepts merely because they share generic words, "
+        "and never combine unrelated syllabus units. Aim for substantially fewer, meaningful groups "
+        "when the input contains related concepts. Return every input concept exactly once, including "
+        "a one-member group when it truly stands alone. Use a clear exam-level noun phrase for each "
+        "group and a specific summary under 300 characters that covers its members. Return ONLY a JSON "
+        "array of objects with name, summary, and members (an array of exact input names). Do not "
+        "introduce material absent from the input.\n\n" + json.dumps(
             [{"name": t["name"], "summary": t["summary"]} for t in topics], ensure_ascii=False
         )
     )
@@ -134,6 +128,42 @@ def _merge_topics(topics: list[dict]) -> list[dict]:
         merged.append({"name": name.strip(), "summary": summary.strip(), "sources": sources})
     merged.extend(t for t in topics if t["name"] not in used)
     return merged
+
+
+def _deduplicate_topics(topics: list[dict]) -> list[dict]:
+    found = {}
+    for topic in topics:
+        key = re.sub(r"\W+", " ", topic["name"].lower()).strip()
+        if key in found:
+            found[key]["sources"].extend(
+                source for source in topic["sources"] if source not in found[key]["sources"]
+            )
+        else:
+            found[key] = topic
+    return list(found.values())
+
+
+def _merge_topics(topics: list[dict]) -> list[dict]:
+    if len(topics) < 2:
+        return topics
+
+    # Map large syllabi into bounded requests, then repeatedly reduce the resulting
+    # groups. The final pass sees every remaining exam-level topic together, so
+    # concepts produced from different source batches can still be combined.
+    current = _deduplicate_topics(topics)
+    for _ in range(4):
+        if len(current) <= 30:
+            return _deduplicate_topics(_merge_topic_batch(current))
+        reduced = []
+        for start in range(0, len(current), 30):
+            reduced.extend(_merge_topic_batch(current[start:start + 30]))
+        reduced = _deduplicate_topics(reduced)
+        if len(reduced) >= len(current):
+            # Reorder before one more bounded pass so previously separated topic
+            # families are not permanently isolated by source order.
+            reduced.sort(key=lambda topic: topic["name"].lower())
+        current = reduced
+    return current
 
 
 def _paper_batches(pages: list[dict]):
@@ -281,7 +311,7 @@ def analyze_subject(subject: str, *, force: bool = False) -> dict:
     fingerprint = corpus_fingerprint(teaching + papers)
     provider, model = provider_settings()
     existing = get_analysis(subject)
-    if not force and existing and existing.get("analysis_version") == 2 and existing.get("fingerprint") == fingerprint and existing.get("model") == model and existing.get("provider") == provider:
+    if not force and existing and existing.get("analysis_version") == 3 and existing.get("fingerprint") == fingerprint and existing.get("model") == model and existing.get("provider") == provider:
         report("Using saved analysis for unchanged material", 1)
         return existing
     if not teaching:
@@ -311,7 +341,7 @@ def analyze_subject(subject: str, *, force: bool = False) -> dict:
     report("Saving course insights", 0.98)
     result = {"subject": subject, "generated_at": datetime.now(timezone.utc).isoformat(),
               "fingerprint": fingerprint, "model": model, "provider": provider,
-              "analysis_version": 2,
+              "analysis_version": 3,
               "topics": topics, "questions": questions,
               "recurring_groups": repeats}
     save_analysis(result)
